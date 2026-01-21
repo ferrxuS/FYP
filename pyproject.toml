@@ -5,7 +5,7 @@ description = "Shipping Container Defect Segmentation using Continual Learning"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "torch",
+    "torch>=2.4.0,<2.6.0",
     "torchvision",
     "pillow",
     "numpy",
@@ -20,7 +20,3 @@ dependencies = [
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.uv]
-dev-dependencies = [
-    "ipykernel",
-]
