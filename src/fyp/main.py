@@ -118,10 +118,13 @@ if __name__ == "__main__":
     # Train baseline model first
     print("\nTRAINING BASELINE MODEL\n")
     train_baseline_model(
-        num_epochs=1,
-        subset_size=10,
+        num_epochs=NUM_EPOCHS,
+        subset_size=SUBSET_SIZE,
         save_path=SAVE_DIR / "baseline_model.pth"
     )
 
     # Run CL experiments
-    run_all_cl_strategies(num_epochs_per_task=1, subset_size=10)
+    run_all_cl_strategies(
+        num_epochs_per_task=NUM_EPOCHS,
+        subset_size=SUBSET_SIZE
+    )
