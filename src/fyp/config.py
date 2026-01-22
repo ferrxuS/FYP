@@ -25,10 +25,10 @@ DROPOUT = 0.1               # Dropout probability
 
 # Training Configuration
 BATCH_SIZE = 8
-LEARNING_RATE = 1e-3
-NUM_EPOCHS = 1
-SUBSET_SIZE = 10
+LEARNING_RATE = 5e-4        # Balanced for 10 epochs
+NUM_EPOCHS = 10             # Increased for full training
+SUBSET_SIZE = None          # Use full dataset
 
 # Continual Learning Configuration
-NUM_TASKS = 3
-MEMORY_SIZE = 500           # Replay buffer size for ER/DER
+NUM_TASKS = 5               # Test forgetting over multiple sequence steps
+MEMORY_SIZE = 500           # Replay buffer size for ER/DER (approx 15-20% of data)
