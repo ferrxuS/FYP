@@ -31,8 +31,8 @@ def run_cl_experiment(
         subset_size=subset_size // 2 if subset_size else None
     )
 
-    train_tasks = TaskIncrementalDataset(train_dataset, num_tasks=NUM_TASKS)
-    val_tasks = TaskIncrementalDataset(val_dataset, num_tasks=NUM_TASKS)
+    train_tasks = TaskIncrementalDataset(train_dataset, num_tasks=NUM_TASKS, mode="class")
+    val_tasks = TaskIncrementalDataset(val_dataset, num_tasks=NUM_TASKS, mode="class")
 
     # Create fresh model for this experiment
     model = ContainerDefectSegmenter(
@@ -116,12 +116,12 @@ if __name__ == "__main__":
     extract_dataset(ZIP_PATH, DATASET_ROOT)
     
     # Train baseline model first
-    print("\nTRAINING BASELINE MODEL\n")
-    train_baseline_model(
-        num_epochs=NUM_EPOCHS,
-        subset_size=SUBSET_SIZE,
-        save_path=SAVE_DIR / "baseline_model.pth"
-    )
+    # print("\nTRAINING BASELINE MODEL\n")
+    # train_baseline_model(
+    #     num_epochs=NUM_EPOCHS,
+    #     subset_size=SUBSET_SIZE,
+    #     save_path=SAVE_DIR / "baseline_model.pth"
+    # )
 
     # Run CL experiments
     run_all_cl_strategies(
