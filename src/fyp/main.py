@@ -13,14 +13,16 @@ from .cl.factory import get_cl_strategy
 from .cl.trainer import CLTrainer
 from .training.trainer_baseline import train_baseline_model
 from .utils.visualization import generate_cl_report
-from .utils.helpers import extract_dataset
+from .utils.helpers import extract_dataset, get_next_run_index
 from .config import ZIP_PATH, DATASET_ROOT
 
 def run_cl_experiment(
     strategy_name: str,
     num_epochs_per_task: int = NUM_EPOCHS,
     subset_size: int = SUBSET_SIZE,
-    save_results: bool = True
+    save_results: bool = True,
+    save_dir: Path = SAVE_DIR,
+    results_dir: Path = RESULTS_DIR
 ):
     """Run a complete CL experiment with a single strategy"""
 
@@ -54,19 +56,21 @@ def run_cl_experiment(
     )
 
     # Run training
-    results = trainer.train(num_epochs_per_task=num_epochs_per_task, save_dir=SAVE_DIR)
+    results = trainer.train(num_epochs_per_task=num_epochs_per_task, save_dir=save_dir)
 
     # Save results
     if save_results:
-        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-        results_file = RESULTS_DIR / f"cl_results_{strategy_name}.json"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        results_file = results_dir / f"cl_results_{strategy_name}.json"
         trainer.save_results(results_file)
 
     return results
 
 def run_all_cl_strategies(
     num_epochs_per_task: int = NUM_EPOCHS,
-    subset_size: int = SUBSET_SIZE
+    subset_size: int = SUBSET_SIZE,
+    save_dir: Path = SAVE_DIR,
+    results_dir: Path = RESULTS_DIR
 ):
     """Run all CL strategies and compare results"""
     strategies = ['naive', 'er', 'der++']
@@ -83,7 +87,9 @@ def run_all_cl_strategies(
                 strategy_name=strategy_name,
                 num_epochs_per_task=num_epochs_per_task,
                 subset_size=subset_size,
-                save_results=True
+                save_results=True,
+                save_dir=save_dir,
+                results_dir=results_dir
             )
             all_results[strategy_name] = results
         except Exception as e:
@@ -93,7 +99,7 @@ def run_all_cl_strategies(
             all_results[strategy_name] = None
 
     _print_comparison_summary(all_results)
-    generate_cl_report(all_results, save_dir=RESULTS_DIR)
+    generate_cl_report(all_results, save_dir=results_dir)
     return all_results
 
 def _print_comparison_summary(all_results: dict):
@@ -114,17 +120,32 @@ def _print_comparison_summary(all_results: dict):
 if __name__ == "__main__":
     # Extract dataset if missing
     extract_dataset(ZIP_PATH, DATASET_ROOT)
+
+    # Get next available run index (synced for both models and results)
+    run_idx = get_next_run_index([SAVE_DIR, RESULTS_DIR])
+    current_save_dir = SAVE_DIR / f"run_{run_idx}"
+    current_results_dir = RESULTS_DIR / f"run_{run_idx}"
     
-    # Train baseline model first
+    # Create directories immediately
+    current_save_dir.mkdir(parents=True, exist_ok=True)
+    current_results_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"Experiment Run: {run_idx}")
+    print(f"Output Directory (Models): {current_save_dir}")
+    print(f"Output Directory (Results): {current_results_dir}")
+
+    # Train baseline model first (uncomment to run baseline)
     # print("\nTRAINING BASELINE MODEL\n")
     # train_baseline_model(
     #     num_epochs=NUM_EPOCHS,
     #     subset_size=SUBSET_SIZE,
-    #     save_path=SAVE_DIR / "baseline_model.pth"
+    #     save_path=current_save_dir / "baseline_model.pth"
     # )
 
     # Run CL experiments
     run_all_cl_strategies(
         num_epochs_per_task=NUM_EPOCHS,
-        subset_size=SUBSET_SIZE
+        subset_size=SUBSET_SIZE,
+        save_dir=current_save_dir,
+        results_dir=current_results_dir
     )

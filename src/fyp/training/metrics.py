@@ -1,7 +1,8 @@
 import torch
 import numpy as np
+from ..config import NUM_CLASSES
 
-def compute_iou(predictions, targets, num_classes=2):
+def compute_iou(predictions, targets, num_classes=NUM_CLASSES):
     """Compute mean IoU across classes"""
     ious = []
     for cls in range(num_classes):

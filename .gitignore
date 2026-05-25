@@ -36,6 +36,7 @@ MANIFEST
 
 # Project Specific
 data/dataset/
+data/coco_dataset/
 data/*.zip
 models/*.pth
 results/

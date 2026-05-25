@@ -44,3 +44,18 @@ def load_trained_model(model_path, device='cuda'):
 
     print(f"Model loaded from: {model_path}")
     return model
+
+def get_next_run_index(base_dirs: list, prefix: str = "run_") -> int:
+    """
+    Finds the next available index N such that prefix_N does not exist in any of base_dirs.
+    """
+    i = 1
+    while True:
+        exists = False
+        for d in base_dirs:
+            if (Path(d) / f"{prefix}{i}").exists():
+                exists = True
+                break
+        if not exists:
+            return i
+        i += 1
