@@ -38,6 +38,7 @@ MANIFEST
 data/dataset/
 data/coco_dataset/
 data/*.zip
-models/*.pth
+models/
 results/
+jobs/
 !results/.gitkeep
