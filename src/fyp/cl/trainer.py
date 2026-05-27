@@ -20,6 +20,7 @@ class CLTrainer:
         self.device = device
         self.num_tasks = task_manager.num_tasks
         self.metrics = CLMetricsTracker(num_tasks=self.num_tasks)
+        self.pixel_metrics = CLMetricsTracker(num_tasks=self.num_tasks)
         self.training_history = []
 
     def train(self, num_epochs_per_task: int = NUM_EPOCHS, save_dir: str = SAVE_DIR):
@@ -39,9 +40,10 @@ class CLTrainer:
             self.strategy.after_task(task_loader, task_id)
 
             print(f"\n  Evaluating on all tasks...")
-            task_accuracies = self._evaluate_all_tasks(task_id)
-            self.metrics.update(task_id, task_accuracies)
-            self._print_task_results(task_id, task_accuracies)
+            task_ious, task_accs = self._evaluate_all_tasks(task_id)
+            self.metrics.update(task_id, task_ious)
+            self.pixel_metrics.update(task_id, task_accs)
+            self._print_task_results(task_id, task_ious, task_accs)
 
             # Save checkpoint
             checkpoint_path = save_dir / f"{self.strategy.name.replace(' ', '_')}_task{task_id+1}.pth"
@@ -51,22 +53,31 @@ class CLTrainer:
             self.training_history.append({
                 'task_id': task_id,
                 'train_metrics': train_metrics,
-                'task_accuracies': task_accuracies,
+                'task_accuracies': task_ious,
+                'task_pixel_accuracies': task_accs,
                 'avg_accuracy': self.metrics.compute_average_accuracy(task_id),
-                'forgetting': self.metrics.compute_forgetting(task_id)
+                'avg_pixel_accuracy': self.pixel_metrics.compute_average_accuracy(task_id),
+                'forgetting': self.metrics.compute_forgetting(task_id),
+                'pixel_forgetting': self.pixel_metrics.compute_forgetting(task_id)
             })
 
         print("TRAINING COMPLETE")
+        print("\n" + "="*60 + "\nSUMMARY OF IoU METRICS\n" + "="*60)
         self.metrics.print_summary()
+        
+        print("\n" + "="*60 + "\nSUMMARY OF PIXEL ACCURACY METRICS\n" + "="*60)
+        self.pixel_metrics.print_summary()
 
         return {
             'metrics': self.metrics.get_summary(),
+            'pixel_metrics': self.pixel_metrics.get_summary(),
             'history': self.training_history,
             'strategy_name': self.strategy.name
         }
 
     def _evaluate_all_tasks(self, current_task: int):
-        task_accuracies = {}
+        task_ious = {}
+        task_accs = {}
 
         for eval_task_id in range(current_task + 1):
             if self.val_task_manager is not None:
@@ -75,27 +86,34 @@ class CLTrainer:
                 eval_loader = self.task_manager.get_task_loader(eval_task_id, batch_size=BATCH_SIZE, shuffle=False)
 
             iou, acc = self.strategy.evaluate_on_task(eval_loader)
-            task_accuracies[eval_task_id] = iou
+            task_ious[eval_task_id] = iou
+            task_accs[eval_task_id] = acc
 
-        return task_accuracies
+        return task_ious, task_accs
 
-    def _print_task_results(self, current_task: int, task_accuracies: dict):
+    def _print_task_results(self, current_task: int, task_ious: dict, task_accs: dict):
         print(f"\n  Performance after Task {current_task + 1}:")
-        for task_id, iou in task_accuracies.items():
-            print(f"    Task {task_id + 1}: IoU = {iou:.4f}")
+        for task_id in task_ious.keys():
+            iou = task_ious[task_id]
+            acc = task_accs[task_id]
+            print(f"    Task {task_id + 1}: IoU = {iou:.4f} | Pixel Acc = {acc:.4f}")
 
-        avg_acc = self.metrics.compute_average_accuracy(current_task)
-        forgetting = self.metrics.compute_forgetting(current_task)
+        avg_iou = self.metrics.compute_average_accuracy(current_task)
+        forgetting_iou = self.metrics.compute_forgetting(current_task)
+
+        avg_acc = self.pixel_metrics.compute_average_accuracy(current_task)
+        forgetting_acc = self.pixel_metrics.compute_forgetting(current_task)
 
         print(f"  ─────────────────────────────")
-        print(f"    Avg Accuracy: {avg_acc:.4f}")
-        print(f"    Forgetting:   {forgetting:.4f}")
+        print(f"    Avg IoU:      {avg_iou:.4f} | Avg Pixel Acc: {avg_acc:.4f}")
+        print(f"    Forgetting:   {forgetting_iou:.4f} | Forgetting Acc: {forgetting_acc:.4f}")
 
     def save_results(self, filepath: str):
         results = {
             'strategy': self.strategy.name,
             'num_tasks': self.num_tasks,
             'metrics': self.metrics.get_summary(),
+            'pixel_metrics': self.pixel_metrics.get_summary(),
             'history': self.training_history
         }
 

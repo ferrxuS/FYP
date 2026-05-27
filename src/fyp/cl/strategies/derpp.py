@@ -44,21 +44,23 @@ class DarkExperienceReplayPP(BaseCLStrategy):
                 total_loss_value = loss_ce
 
                 if len(self.buffer) > 0:
-                    batch_size = min(images.shape[0] // 2, len(self.buffer))
-                    buffer_samples = random.sample(self.buffer, batch_size)
+                    replay_batch_size = images.shape[0] // 2
+                    if replay_batch_size > 0:
+                        batch_size = min(replay_batch_size, len(self.buffer))
+                        buffer_samples = random.sample(self.buffer, batch_size)
 
-                    replay_images = torch.stack([s['image'] for s in buffer_samples]).to(self.device)
-                    replay_masks = torch.stack([s['mask'] for s in buffer_samples]).to(self.device)
-                    replay_logits = torch.stack([s['logits'] for s in buffer_samples]).to(self.device)
+                        replay_images = torch.stack([s['image'] for s in buffer_samples]).to(self.device)
+                        replay_masks = torch.stack([s['mask'] for s in buffer_samples]).to(self.device)
+                        replay_logits = torch.stack([s['logits'] for s in buffer_samples]).to(self.device)
 
-                    current_replay_logits = self.model(replay_images)
+                        current_replay_logits = self.model(replay_images)
 
-                    replay_targets = replay_masks.squeeze(1).long()
-                    loss_replay_ce = self.criterion(current_replay_logits, replay_targets)
+                        replay_targets = replay_masks.squeeze(1).long()
+                        loss_replay_ce = self.criterion(current_replay_logits, replay_targets)
 
-                    loss_distill = nn.functional.mse_loss(current_replay_logits, replay_logits)
+                        loss_distill = nn.functional.mse_loss(current_replay_logits, replay_logits)
 
-                    total_loss_value = loss_ce + self.beta * loss_replay_ce + self.alpha * loss_distill
+                        total_loss_value = loss_ce + self.beta * loss_replay_ce + self.alpha * loss_distill
 
                 total_loss_value.backward()
                 self.optimizer.step()

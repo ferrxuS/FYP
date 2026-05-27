@@ -34,15 +34,17 @@ class ExperienceReplay(BaseCLStrategy):
 
                 # Get replay samples if buffer not empty
                 if len(self.buffer) > 0:
-                    replay_images, replay_masks = self.buffer.sample(
-                        batch_size=images.shape[0] // 2,  # Half batch from buffer
-                        device=self.device
-                    )
+                    replay_batch_size = images.shape[0] // 2 # Half batch from buffer
+                    if replay_batch_size > 0:
+                        replay_images, replay_masks = self.buffer.sample(
+                            batch_size=replay_batch_size,
+                            device=self.device
+                        )
 
-                    if replay_images is not None:
-                        images = torch.cat([images, replay_images], dim=0)
-                        replay_targets = replay_masks.squeeze(1).long()
-                        targets = torch.cat([targets, replay_targets], dim=0)
+                        if replay_images is not None:
+                            images = torch.cat([images, replay_images], dim=0)
+                            replay_targets = replay_masks.squeeze(1).long()
+                            targets = torch.cat([targets, replay_targets], dim=0)
 
                 self.optimizer.zero_grad()
                 logits = self.model(images)
