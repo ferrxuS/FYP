@@ -50,6 +50,13 @@ SUBSET_SIZE = None          # Use full dataset
 # Continual Learning Configuration
 NUM_TASKS = 5               # Test forgetting over multiple sequence steps
 MEMORY_SIZE = 500           # Replay buffer size for ER/DER (approx 15-20% of data)
+MER_BETA = 0.1              # within-batch Reptile LR
+MER_GAMMA = 0.1             # across-batch Reptile LR
+MER_BATCH_NUM = 1           # number of inner iterations per observe call
+
+# SI Hyperparameters (aimagelab/mammoth architecture)
+SI_C = 0.5                  # penalty weight - higher = more protection, less plasticity
+SI_XI = 1.0                 # damping term - prevents division by zero
 
 # Task Splitting Options
 IGNORE_COMPOSITE = False    # If True, skip images that have more than one type of defect

@@ -1,6 +1,8 @@
 from .strategies.naive import NaiveFineTuning
 from .strategies.er import ExperienceReplay
 from .strategies.derpp import DarkExperienceReplayPP
+from .strategies.mer import MetaExperienceReplay
+from .strategies.si import SynapticIntelligence
 from ..config import LEARNING_RATE, DEVICE
 
 def get_cl_strategy(strategy_name, model, device=DEVICE, lr=LEARNING_RATE):
@@ -9,6 +11,8 @@ def get_cl_strategy(strategy_name, model, device=DEVICE, lr=LEARNING_RATE):
         'naive': NaiveFineTuning,
         'er': ExperienceReplay,
         'der++': DarkExperienceReplayPP,
+        'mer': MetaExperienceReplay,
+        'si': SynapticIntelligence,
     }
 
     if strategy_name.lower() not in strategies:
