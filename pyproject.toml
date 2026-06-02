@@ -16,6 +16,7 @@ dependencies = [
     "seaborn",
     "pycocotools",
     "opencv-python",
+    "streamlit>=1.58.0",
 ]
 
 [build-system]
