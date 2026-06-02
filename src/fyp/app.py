@@ -129,7 +129,7 @@ else:
     selected_strategy = st.sidebar.selectbox("Active Strategy for Analytics", available_strategies)
 
 # Tab separation
-tab_analytics, tab_inference = st.tabs(["📊 CL Analytics & Comparisons", "🔍 Inference Playpen"])
+tab_analytics, tab_inference = st.tabs(["CL Analytics & Comparisons", "Inference Playpen"])
 
 # Category descriptions for defect/repair annotations
 DEFECT_CATEGORIES = {
@@ -146,7 +146,7 @@ with tab_analytics:
     if not selected_strategy:
         st.info("No comparative analytics available for this run directory yet.")
     else:
-        st.markdown(f"### 📈 Comparative Overview for **{selected_run.upper()}**")
+        st.markdown(f"### Comparative Overview for **{selected_run.upper()}**")
         
         # Strategy overview cards side-by-side
         cols = st.columns(len(available_strategies))
@@ -171,7 +171,7 @@ with tab_analytics:
         col_left, col_right = st.columns([1, 1])
 
         with col_left:
-            st.markdown(f"#### 🌡️ accuracy Heatmap Matrix - {selected_strategy.upper()}")
+            st.markdown(f"#### Accuracy Heatmap Matrix - {selected_strategy.upper()}")
             matrix = np.array(results[selected_strategy]['metrics']['Accuracy Matrix'])
             
             fig, ax = plt.subplots(figsize=(7, 5))
@@ -198,7 +198,7 @@ with tab_analytics:
             st.pyplot(fig)
 
         with col_right:
-            st.markdown("#### 📉 Task Performance Retention Curves")
+            st.markdown("#### Task Performance Retention Curves")
             fig2, ax2 = plt.subplots(figsize=(7, 5))
             num_tasks = matrix.shape[0]
             
@@ -231,7 +231,7 @@ with tab_analytics:
 
 # --- TAB 2: INFERENCE PLAYPEN ---
 with tab_inference:
-    st.markdown("### 🔍 Real-Time Defect Segmentation Inference Playpen")
+    st.markdown("### Real-Time Defect Segmentation Inference Playpen")
     st.write("Test your trained continual learning models dynamically on validation images.")
 
     # Model checkpoints selection
@@ -258,18 +258,20 @@ with tab_inference:
             
             dataset = get_cached_dataset()
             
+            if "image_index_val" not in st.session_state:
+                st.session_state["image_index_val"] = 0
+
             col_sel1, col_sel2 = st.columns([2, 1])
             with col_sel1:
                 image_idx = st.number_input(
                     f"Select Image Index (0 to {len(dataset)-1})",
-                    min_value=0, max_value=len(dataset)-1, value=0
+                    min_value=0, max_value=len(dataset)-1,
+                    key="image_index_val"
                 )
             with col_sel2:
                 # Random selector button
-                if st.button("🎲 Random Validation Image"):
-                    image_idx = int(np.random.randint(0, len(dataset)))
-                    # Forces number input update using session state hack
-                    st.session_state["image_index_val"] = image_idx
+                if st.button("Random Validation Image"):
+                    st.session_state["image_index_val"] = int(np.random.randint(0, len(dataset)))
                     st.rerun()
 
             # Retrieve selected image and mask
@@ -334,14 +336,14 @@ with tab_inference:
                 col_v1, col_v2, col_v3 = st.columns([1, 1, 1])
 
                 with col_v1:
-                    st.image(image_denorm, caption=f"Original Image: {filename}", use_column_width=True)
+                    st.image(image_denorm, caption=f"Original Image: {filename}", use_container_width=True)
                 with col_v2:
-                    st.image(gt_blended, caption="Ground Truth Defect Overlay", use_column_width=True)
+                    st.image(gt_blended, caption="Ground Truth Defect Overlay", use_container_width=True)
                 with col_v3:
-                    st.image(pred_blended, caption=f"Model Prediction ({selected_ckpt})", use_column_width=True)
+                    st.image(pred_blended, caption=f"Model Prediction ({selected_ckpt})", use_container_width=True)
 
                 # Display Color Legend
-                st.markdown("#### 🎨 Color Legend Mapping")
+                st.markdown("#### Color Legend Mapping")
                 legend_cols = st.columns(5)
                 for cat_id in range(1, 6):
                     with legend_cols[cat_id - 1]:
