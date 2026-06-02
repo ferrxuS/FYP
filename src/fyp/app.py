@@ -261,13 +261,18 @@ with tab_inference:
             if "image_index_val" not in st.session_state:
                 st.session_state["image_index_val"] = 0
 
+            current_idx = st.session_state["image_index_val"]
+
             col_sel1, col_sel2 = st.columns([2, 1])
             with col_sel1:
                 image_idx = st.number_input(
                     f"Select Image Index (0 to {len(dataset)-1})",
                     min_value=0, max_value=len(dataset)-1,
-                    key="image_index_val"
+                    value=current_idx
                 )
+                if image_idx != current_idx:
+                    st.session_state["image_index_val"] = image_idx
+                    st.rerun()
             with col_sel2:
                 # Random selector button
                 if st.button("Random Validation Image"):
