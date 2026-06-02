@@ -8,7 +8,7 @@ dependencies = [
     "torch>=2.4.0,<2.6.0",
     "torchvision",
     "pillow",
-    "numpy",
+    "numpy<2.0.0",
     "matplotlib",
     "tqdm",
     "transformers",
@@ -17,6 +17,8 @@ dependencies = [
     "pycocotools",
     "opencv-python",
     "streamlit>=1.58.0",
+    "pyarrow<16.0.0",
+    "libcst<1.2.0",	
 ]
 
 [build-system]
