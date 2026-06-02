@@ -131,14 +131,14 @@ else:
 # Tab separation
 tab_analytics, tab_inference = st.tabs(["📊 CL Analytics & Comparisons", "🔍 Inference Playpen"])
 
-# Category descriptions for defect annotations
+# Category descriptions for defect/repair annotations
 DEFECT_CATEGORIES = {
     0: "Background",
-    1: "Rust/Corrosion",
-    2: "Structural Dent",
-    3: "Paint Defect",
-    4: "Crack",
-    5: "Standard ID Decal"
+    1: "Paint Repair (PAINT-P)",
+    2: "Patch Repair (PATCH-PT)",
+    3: "Removal Repair (REMOVE-R)",
+    4: "Sealant Repair (SEALANT-SE)",
+    5: "Wash Repair (WASH-W)"
 }
 
 # --- TAB 1: ANALYTICS ---
@@ -299,11 +299,11 @@ with tab_inference:
                 # Map colors: rust=red, structural=orange, paint=yellow, crack=purple, decal=blue
                 colors = [
                     [0, 0, 0],       # Background (transparent)
-                    [239, 68, 68],   # 1: Rust (Red)
-                    [245, 158, 11],  # 2: Structural Dent (Orange)
-                    [252, 211, 77],  # 3: Paint Defect (Yellow)
-                    [139, 92, 246],  # 4: Crack (Purple)
-                    [59, 130, 246]   # 5: Standard Decal (Blue)
+                    [239, 68, 68],   # 1: Paint Repair (Red)
+                    [245, 158, 11],  # 2: Patch Repair (Orange)
+                    [252, 211, 77],  # 3: Removal Repair (Yellow)
+                    [139, 92, 246],  # 4: Sealant Repair (Purple)
+                    [59, 130, 246]   # 5: Wash Repair (Blue)
                 ]
 
                 # Create colored overlays
