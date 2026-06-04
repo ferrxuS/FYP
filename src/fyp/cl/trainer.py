@@ -36,6 +36,7 @@ class CLTrainer:
             print(f"{'█'*60}")
 
             task_loader = self.task_manager.get_task_loader(task_id, batch_size=BATCH_SIZE, shuffle=True)
+            self.strategy.before_task(task_id)
             train_metrics = self.strategy.train_task(task_loader, task_id, num_epochs=num_epochs_per_task)
             self.strategy.after_task(task_loader, task_id)
 

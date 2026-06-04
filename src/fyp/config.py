@@ -58,6 +58,10 @@ MER_BATCH_NUM = 1           # number of inner iterations per observe call
 SI_C = 0.5                  # penalty weight - higher = more protection, less plasticity
 SI_XI = 1.0                 # damping term - prevents division by zero
 
+# LwF Hyperparameters
+LWF_ALPHA = 0.5             # distillation loss weight
+LWF_TEMPERATURE = 2.0       # softmax temperature
+
 # Task Splitting Options
 IGNORE_COMPOSITE = False    # If True, skip images that have more than one type of defect
 ALLOW_REUSE = False         # If True, images with multiple defects can appear in multiple tasks

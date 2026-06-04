@@ -33,6 +33,9 @@ class BaseCLStrategy(ABC):
     ):
         pass
 
+    def before_task(self, task_id: int):
+        pass
+
     @abstractmethod
     def after_task(self, task_loader: DataLoader, task_id: int):
         pass
