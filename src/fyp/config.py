@@ -62,6 +62,10 @@ SI_XI = 1.0                 # damping term - prevents division by zero
 LWF_ALPHA = 0.5             # distillation loss weight
 LWF_TEMPERATURE = 2.0       # softmax temperature
 
+# SLCA Hyperparameters
+SLCA_CA_EPOCHS = 5          # alignment epochs
+SLCA_LOGIT_NORM = 0.1       # logit L2 norm weight
+
 # Task Splitting Options
 IGNORE_COMPOSITE = False    # If True, skip images that have more than one type of defect
 ALLOW_REUSE = False         # If True, images with multiple defects can appear in multiple tasks

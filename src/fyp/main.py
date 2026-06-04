@@ -74,7 +74,7 @@ def run_all_cl_strategies(
 ):
     """Run all CL strategies and compare results"""
     # strategies = ['naive', 'er', 'der++', 'mer', 'si']
-    strategies = ['mer', 'si']
+    strategies = ['lwf', 'slca']
     all_results = {}
 
     print("\nRUNNING ALL CL STRATEGIES\n")
