@@ -41,6 +41,7 @@ def run_cl_experiment(
         backbone_name=BACKBONE,
         num_classes=NUM_CLASSES,
         freeze_backbone=True,
+        unfreeze_last_n_blocks=12,
         decoder_hidden_dim=DECODER_HIDDEN_DIM
     ).to(DEVICE)
 

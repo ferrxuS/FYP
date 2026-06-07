@@ -46,9 +46,13 @@ class CLTrainer:
             self.pixel_metrics.update(task_id, task_accs)
             self._print_task_results(task_id, task_ious, task_accs)
 
-            # Save checkpoint
+            # Save checkpoint (save only trainable parameters to save massive disk space)
             checkpoint_path = save_dir / f"{self.strategy.name.replace(' ', '_')}_task{task_id+1}.pth"
-            torch.save(self.strategy.model.state_dict(), checkpoint_path)
+            trainable_state_dict = {
+                k: v for k, v in self.strategy.model.state_dict().items()
+                if v.requires_grad or "head" in k
+            }
+            torch.save(trainable_state_dict, checkpoint_path)
             print(f"  Checkpoint saved: {checkpoint_path}")
 
             self.training_history.append({

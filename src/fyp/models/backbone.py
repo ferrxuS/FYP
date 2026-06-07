@@ -27,6 +27,7 @@ class DINOv3FeatureExtractor(nn.Module):
         model_name: str = BACKBONE,
         patch_size: int = PATCH_SIZE,
         freeze: bool = True,
+        unfreeze_last_n_blocks: int = 0,
     ):
         super().__init__()
         self.model_name = model_name
@@ -36,22 +37,31 @@ class DINOv3FeatureExtractor(nn.Module):
         # Load pre-trained model
         self.backbone = AutoModel.from_pretrained(self.MODEL_REGISTRY[model_name])
 
-        if freeze:
-            for param in self.backbone.parameters():
-                param.requires_grad = False
+        # Freeze everything first
+        for param in self.backbone.parameters():
+            param.requires_grad = False
 
-        self.backbone.eval()
+        # Selectively unfreeze last N blocks and final layernorm
+        if unfreeze_last_n_blocks > 0:
+            blocks = self.backbone.layer
+            for block in blocks[-unfreeze_last_n_blocks:]:
+                for param in block.parameters():
+                    param.requires_grad = True
+            for param in self.backbone.norm.parameters():
+                param.requires_grad = True
+
+        if freeze and unfreeze_last_n_blocks == 0:
+            self.backbone.eval()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, C, H, W = x.shape
         H_patches, W_patches = H // self.patch_size, W // self.patch_size
 
-        with torch.set_grad_enabled(not self.training):
-            outputs = self.backbone(
-                x,
-                output_hidden_states=True,
-                return_dict=True
-            )
+        outputs = self.backbone(
+            x,
+            output_hidden_states=True,
+            return_dict=True
+        )
 
         # Extract spatial patch tokens (skip CLS + register tokens)
         last_layer = outputs.hidden_states[-1]

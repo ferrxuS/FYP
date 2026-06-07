@@ -101,9 +101,9 @@ def load_pytorch_model(run_name, checkpoint_name):
         decoder_hidden_dim=DECODER_HIDDEN_DIM
     )
     try:
-        # Load weights on cpu or device
+        # Load weights on cpu or device (strict=False supports pruned checkpoints)
         state_dict = torch.load(checkpoint_path, map_location=DEVICE)
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
         model.to(DEVICE)
         model.eval()
         return model, None
