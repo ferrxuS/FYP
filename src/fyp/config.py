@@ -40,6 +40,7 @@ IMAGE_SIZE = 768            # must be divisible by PATCH_SIZE
 PATCH_SIZE = 16
 DECODER_HIDDEN_DIM = 256
 DROPOUT = 0.1               # Dropout probability
+UNFREEZE_LAST_N_BLOCKS = 0  # 0 = fully frozen backbone, N = unfreeze last N blocks
 
 # Training Configuration
 BATCH_SIZE = 8

@@ -4,7 +4,7 @@ from pathlib import Path
 from .config import (
     TRAIN_DIR, VALID_DIR, NUM_TASKS, NUM_EPOCHS, 
     SUBSET_SIZE, BACKBONE, NUM_CLASSES, DECODER_HIDDEN_DIM, 
-    LEARNING_RATE, SAVE_DIR, RESULTS_DIR, DEVICE
+    LEARNING_RATE, SAVE_DIR, RESULTS_DIR, DEVICE, UNFREEZE_LAST_N_BLOCKS
 )
 from .data.dataset import ContainerDefectDataset
 from .data.task_manager import TaskIncrementalDataset
@@ -22,7 +22,8 @@ def run_cl_experiment(
     subset_size: int = SUBSET_SIZE,
     save_results: bool = True,
     save_dir: Path = SAVE_DIR,
-    results_dir: Path = RESULTS_DIR
+    results_dir: Path = RESULTS_DIR,
+    unfreeze_last_n_blocks: int = UNFREEZE_LAST_N_BLOCKS
 ):
     """Run a complete CL experiment with a single strategy"""
 
@@ -41,7 +42,7 @@ def run_cl_experiment(
         backbone_name=BACKBONE,
         num_classes=NUM_CLASSES,
         freeze_backbone=True,
-        unfreeze_last_n_blocks=12,
+        unfreeze_last_n_blocks=unfreeze_last_n_blocks,
         decoder_hidden_dim=DECODER_HIDDEN_DIM
     ).to(DEVICE)
 
@@ -71,17 +72,20 @@ def run_all_cl_strategies(
     num_epochs_per_task: int = NUM_EPOCHS,
     subset_size: int = SUBSET_SIZE,
     save_dir: Path = SAVE_DIR,
-    results_dir: Path = RESULTS_DIR
+    results_dir: Path = RESULTS_DIR,
+    strategies: list = None,
+    unfreeze_last_n_blocks: int = UNFREEZE_LAST_N_BLOCKS
 ):
     """Run all CL strategies and compare results"""
-    # strategies = ['naive', 'er', 'der++', 'mer', 'si', 'lwf', 'slca']
-    strategies = ['er_ace']
+    if strategies is None:
+        strategies = ['der++']
     all_results = {}
 
     print("\nRUNNING ALL CL STRATEGIES\n")
     print(f"Strategies to test: {strategies}")
     print(f"Epochs per task: {num_epochs_per_task}")
     print(f"Dataset size: {subset_size if subset_size else 'FULL'}")
+    print(f"Unfreeze last N blocks: {unfreeze_last_n_blocks}")
 
     for strategy_name in strategies:
         try:
@@ -91,7 +95,8 @@ def run_all_cl_strategies(
                 subset_size=subset_size,
                 save_results=True,
                 save_dir=save_dir,
-                results_dir=results_dir
+                results_dir=results_dir,
+                unfreeze_last_n_blocks=unfreeze_last_n_blocks
             )
             all_results[strategy_name] = results
         except Exception as e:
@@ -120,6 +125,23 @@ def _print_comparison_summary(all_results: dict):
             print(f"{strategy_name.upper():<20} {'ERROR':>10} {'ERROR':>12} {'ERROR':>10}")
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Continual Learning Experiment Runner")
+    parser.add_argument(
+        "--strategies",
+        nargs="+",
+        type=str,
+        default=["er_ace"],
+        help="List of strategies to run (e.g., naive er der++ lwf slca er_ace)"
+    )
+    parser.add_argument(
+        "--unfreeze_last_n_blocks",
+        type=int,
+        default=UNFREEZE_LAST_N_BLOCKS,
+        help="Number of last blocks to unfreeze in backbone"
+    )
+    args = parser.parse_args()
+
     # Extract dataset if missing
     extract_dataset(ZIP_PATH, DATASET_ROOT)
 
@@ -149,5 +171,7 @@ if __name__ == "__main__":
         num_epochs_per_task=NUM_EPOCHS,
         subset_size=SUBSET_SIZE,
         save_dir=current_save_dir,
-        results_dir=current_results_dir
+        results_dir=current_results_dir,
+        strategies=args.strategies,
+        unfreeze_last_n_blocks=args.unfreeze_last_n_blocks
     )

@@ -48,9 +48,10 @@ class CLTrainer:
 
             # Save checkpoint (save only trainable parameters to save massive disk space)
             checkpoint_path = save_dir / f"{self.strategy.name.replace(' ', '_')}_task{task_id+1}.pth"
+            trainable_keys = {n for n, p in self.strategy.model.named_parameters() if p.requires_grad}
             trainable_state_dict = {
                 k: v for k, v in self.strategy.model.state_dict().items()
-                if v.requires_grad or "head" in k
+                if k in trainable_keys or "head" in k
             }
             torch.save(trainable_state_dict, checkpoint_path)
             print(f"  Checkpoint saved: {checkpoint_path}")
