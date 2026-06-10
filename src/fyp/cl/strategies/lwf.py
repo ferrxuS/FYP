@@ -29,11 +29,15 @@ class LearningWithoutForgetting(BaseCLStrategy):
         Operates on (B, C, H, W) segmentation logits.
         T² scaling follows Hinton et al. knowledge distillation convention.
         """
+        assert new_logits.shape == old_logits.shape, (
+            f"Shape mismatch: new={new_logits.shape}, old={old_logits.shape}"
+        )
         T = self.temperature
         old_soft = F.softmax(old_logits / T, dim=1)
         new_logsoft = F.log_softmax(new_logits / T, dim=1)
-        # kl_div expects (input=log_probs, target=probs)
-        loss = F.kl_div(new_logsoft, old_soft, reduction='batchmean') * (T ** 2)
+        # Compute KL divergence per pixel (sum over channels), then average over batch and space
+        kl_pixel = F.kl_div(new_logsoft, old_soft, reduction='none').sum(dim=1)
+        loss = kl_pixel.mean() * (T ** 2)
         return loss
 
     def before_task(self, task_id):
