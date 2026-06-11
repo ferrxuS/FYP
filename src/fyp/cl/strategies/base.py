@@ -19,10 +19,31 @@ class BaseCLStrategy(ABC):
         self.device = device
         self.lr = lr
         self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(
-            filter(lambda p: p.requires_grad, model.parameters()),
-            lr=lr
-        )
+        # Split learning rates: backbone parameters at 0.1x of head learning rate (lr)
+        backbone_params = []
+        head_params = []
+
+        for name, param in self.model.named_parameters():
+            if not param.requires_grad:
+                continue
+            if "backbone" in name:
+                backbone_params.append(param)
+            else:
+                head_params.append(param)
+
+        param_groups = []
+        if backbone_params:
+            param_groups.append({'params': backbone_params, 'lr': lr * 0.1})
+        if head_params:
+            param_groups.append({'params': head_params, 'lr': lr})
+
+        if param_groups:
+            self.optimizer = optim.Adam(param_groups)
+        else:
+            self.optimizer = optim.Adam(
+                filter(lambda p: p.requires_grad, self.model.parameters()),
+                lr=lr
+            )
 
     @abstractmethod
     def train_task(
@@ -31,6 +52,9 @@ class BaseCLStrategy(ABC):
         task_id: int,
         num_epochs: int = NUM_EPOCHS
     ):
+        pass
+
+    def before_task(self, task_id: int):
         pass
 
     @abstractmethod

@@ -13,12 +13,14 @@ class ContainerDefectSegmenter(nn.Module):
         num_classes: int = NUM_CLASSES,
         freeze_backbone: bool = True,
         decoder_hidden_dim: int = DECODER_HIDDEN_DIM,
+        unfreeze_last_n_blocks: int = 0,
     ):
         super().__init__()
 
         self.backbone = DINOv3FeatureExtractor(
             model_name=backbone_name,
-            freeze=freeze_backbone
+            freeze=freeze_backbone,
+            unfreeze_last_n_blocks=unfreeze_last_n_blocks,
         )
 
         # Segmentation head (decoder)

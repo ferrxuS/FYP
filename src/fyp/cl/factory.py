@@ -3,6 +3,9 @@ from .strategies.er import ExperienceReplay
 from .strategies.derpp import DarkExperienceReplayPP
 from .strategies.mer import MetaExperienceReplay
 from .strategies.si import SynapticIntelligence
+from .strategies.lwf import LearningWithoutForgetting
+from .strategies.slca import SlowLearnerClassifierAlignment
+from .strategies.er_ace import ExperienceReplayACE
 from ..config import LEARNING_RATE, DEVICE
 
 def get_cl_strategy(strategy_name, model, device=DEVICE, lr=LEARNING_RATE):
@@ -13,6 +16,9 @@ def get_cl_strategy(strategy_name, model, device=DEVICE, lr=LEARNING_RATE):
         'der++': DarkExperienceReplayPP,
         'mer': MetaExperienceReplay,
         'si': SynapticIntelligence,
+        'lwf': LearningWithoutForgetting,
+        'slca': SlowLearnerClassifierAlignment,
+        'er_ace': ExperienceReplayACE,
     }
 
     if strategy_name.lower() not in strategies:

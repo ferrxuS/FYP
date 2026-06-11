@@ -40,6 +40,7 @@ IMAGE_SIZE = 768            # must be divisible by PATCH_SIZE
 PATCH_SIZE = 16
 DECODER_HIDDEN_DIM = 256
 DROPOUT = 0.1               # Dropout probability
+UNFREEZE_LAST_N_BLOCKS = 0  # 0 = fully frozen backbone, N = unfreeze last N blocks
 
 # Training Configuration
 BATCH_SIZE = 8
@@ -57,6 +58,14 @@ MER_BATCH_NUM = 1           # number of inner iterations per observe call
 # SI Hyperparameters (aimagelab/mammoth architecture)
 SI_C = 0.5                  # penalty weight - higher = more protection, less plasticity
 SI_XI = 1.0                 # damping term - prevents division by zero
+
+# LwF Hyperparameters
+LWF_ALPHA = 0.5             # distillation loss weight
+LWF_TEMPERATURE = 2.0       # softmax temperature
+
+# SLCA Hyperparameters
+SLCA_CA_EPOCHS = 5          # alignment epochs
+SLCA_LOGIT_NORM = 0.1       # logit L2 norm weight
 
 # Task Splitting Options
 IGNORE_COMPOSITE = False    # If True, skip images that have more than one type of defect
