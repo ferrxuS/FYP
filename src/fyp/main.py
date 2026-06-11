@@ -140,6 +140,11 @@ if __name__ == "__main__":
         default=UNFREEZE_LAST_N_BLOCKS,
         help="Number of last blocks to unfreeze in backbone"
     )
+    parser.add_argument(
+        "--joint",
+        action="store_true",
+        help="Train the joint baseline model (all data at once) instead of CL strategies"
+    )
     args = parser.parse_args()
 
     # Extract dataset if missing
@@ -158,20 +163,21 @@ if __name__ == "__main__":
     print(f"Output Directory (Models): {current_save_dir}")
     print(f"Output Directory (Results): {current_results_dir}")
 
-    # Train baseline model first (uncomment to run baseline)
-    # print("\nTRAINING BASELINE MODEL\n")
-    # train_baseline_model(
-    #     num_epochs=NUM_EPOCHS,
-    #     subset_size=SUBSET_SIZE,
-    #     save_path=current_save_dir / "baseline_model.pth"
-    # )
-
-    # Run CL experiments
-    run_all_cl_strategies(
-        num_epochs_per_task=NUM_EPOCHS,
-        subset_size=SUBSET_SIZE,
-        save_dir=current_save_dir,
-        results_dir=current_results_dir,
-        strategies=args.strategies,
-        unfreeze_last_n_blocks=args.unfreeze_last_n_blocks
-    )
+    if args.joint:
+        print("\nTRAINING JOINT BASELINE MODEL\n")
+        train_baseline_model(
+            num_epochs=NUM_EPOCHS,
+            subset_size=SUBSET_SIZE,
+            save_path=current_save_dir / "baseline_model.pth",
+            unfreeze_last_n_blocks=args.unfreeze_last_n_blocks
+        )
+    else:
+        # Run CL experiments
+        run_all_cl_strategies(
+            num_epochs_per_task=NUM_EPOCHS,
+            subset_size=SUBSET_SIZE,
+            save_dir=current_save_dir,
+            results_dir=current_results_dir,
+            strategies=args.strategies,
+            unfreeze_last_n_blocks=args.unfreeze_last_n_blocks
+        )

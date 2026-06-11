@@ -8,7 +8,7 @@ from ..models.segmenter import ContainerDefectSegmenter
 from .metrics import compute_iou, compute_pixel_accuracy
 from ..config import (
     TRAIN_DIR, VALID_DIR, NUM_EPOCHS, BATCH_SIZE, 
-    LEARNING_RATE, SUBSET_SIZE, SAVE_DIR, DEVICE
+    LEARNING_RATE, SUBSET_SIZE, SAVE_DIR, DEVICE, UNFREEZE_LAST_N_BLOCKS
 )
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device):
@@ -76,7 +76,8 @@ def validate(model, dataloader, criterion, device):
 def train_baseline_model(
     train_dir=TRAIN_DIR, valid_dir=VALID_DIR,
     num_epochs=NUM_EPOCHS, batch_size=BATCH_SIZE, lr=LEARNING_RATE,
-    subset_size=SUBSET_SIZE, save_path=None
+    subset_size=SUBSET_SIZE, save_path=None,
+    unfreeze_last_n_blocks=UNFREEZE_LAST_N_BLOCKS
 ):
     """Train the baseline model (*all data at once, no CL*)"""
     if save_path is None:
@@ -108,13 +109,35 @@ def train_baseline_model(
     )
 
     # Model
-    model = ContainerDefectSegmenter().to(DEVICE)
+    model = ContainerDefectSegmenter(unfreeze_last_n_blocks=unfreeze_last_n_blocks).to(DEVICE)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        lr=lr
-    )
+
+    # Split learning rates: backbone parameters at 0.1x of head learning rate (lr)
+    backbone_params = []
+    head_params = []
+
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        if "backbone" in name:
+            backbone_params.append(param)
+        else:
+            head_params.append(param)
+
+    param_groups = []
+    if backbone_params:
+        param_groups.append({'params': backbone_params, 'lr': lr * 0.1})
+    if head_params:
+        param_groups.append({'params': head_params, 'lr': lr})
+
+    if param_groups:
+        optimizer = optim.Adam(param_groups)
+    else:
+        optimizer = optim.Adam(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=lr
+        )
     print(f"\nBASELINE TRAINING\n")
     print(f"Device: {DEVICE}")
     print(f"Train: {len(train_dataset)} images | Val: {len(val_dataset)} images")
