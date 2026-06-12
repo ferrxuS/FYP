@@ -192,27 +192,67 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
         strat_options.append(disp)
         strat_key_map[disp] = k
         
-    selected_strat_disp = st.sidebar.selectbox("Select Model / Strategy", strat_options)
-    selected_strat_key = strat_key_map[selected_strat_disp]
+    # Analysis type choice
+    analysis_type = st.sidebar.selectbox("Analysis Type", ["Single Strategy", "Compare Strategies"])
     
-    # Select the latest run containing this strategy (runs are sorted descending)
-    selected_run = strategy_to_runs[selected_strat_key][0]
-    run_type = backbone_status
-    
-    results = load_run_results(selected_run)
-    
-    selected_strategy = None
-    for k in results.keys():
-        if k.lower() == selected_strat_key:
-            selected_strategy = k
-            break
-            
-    # Filter to only the selected strategy in Categorized mode
-    if selected_strategy:
-        available_strategies = [selected_strategy]
-        results = {selected_strategy: results[selected_strategy]}
+    if analysis_type == "Single Strategy":
+        selected_strat_disp = st.sidebar.selectbox("Select Model / Strategy", strat_options)
+        selected_strat_key = strat_key_map[selected_strat_disp]
+        
+        # Select the latest run containing this strategy (runs are sorted descending)
+        selected_run = strategy_to_runs[selected_strat_key][0]
+        run_type = backbone_status
+        
+        results = load_run_results(selected_run)
+        
+        selected_strategy = None
+        for k in results.keys():
+            if k.lower() == selected_strat_key:
+                selected_strategy = k
+                break
+                
+        # Filter to only the selected strategy
+        if selected_strategy:
+            available_strategies = [selected_strategy]
+            results = {selected_strategy: results[selected_strategy]}
+        else:
+            available_strategies = list(results.keys())
     else:
+        # Compare Strategies mode
+        selected_strats_disp = st.sidebar.multiselect(
+            "Select Strategies to Compare", 
+            strat_options,
+            default=strat_options[:min(3, len(strat_options))]
+        )
+        
+        if not selected_strats_disp:
+            st.sidebar.warning("Please select at least one strategy to compare.")
+            st.stop()
+            
+        # Build combined results from the latest runs of each selected strategy
+        results = {}
+        strategy_to_run_resolved = {}
+        for disp in selected_strats_disp:
+            skey = strat_key_map[disp]
+            run_resolved = strategy_to_runs[skey][0] # latest run for this strategy
+            run_res = load_run_results(run_resolved)
+            for k in run_res.keys():
+                if k.lower() == skey:
+                    results[k] = run_res[k]
+                    strategy_to_run_resolved[k] = run_resolved
+                    break
+                    
         available_strategies = list(results.keys())
+        
+        # Active strategy for detailed heatmaps and curves
+        selected_strategy = st.sidebar.selectbox(
+            "Active Strategy for Details", 
+            available_strategies,
+            help="Choose which strategy's task-by-task heatmap and retention curves to show below."
+        )
+        
+        selected_run = strategy_to_run_resolved[selected_strategy]
+        run_type = backbone_status
 else:
     selected_run = st.sidebar.selectbox("Select Experiment Run", runs)
     run_type = get_run_type(selected_run)
