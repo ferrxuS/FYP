@@ -309,6 +309,98 @@ with tab_analytics:
                 """, unsafe_allow_html=True)
 
         st.markdown("---")
+        
+        # --- STRATEGY LEADERBOARD ---
+        st.markdown("### Strategy Performance Leaderboard")
+        st.write("Rank and compare all evaluated continual learning strategies under the active backbone status.")
+        
+        # Gather data for leaderboard
+        leaderboard_data = []
+        
+        # Build mapping of display names
+        leaderboard_display_names = {
+            'naive': 'Naive Fine-tuning',
+            'er': 'Experience Replay (ER)',
+            'der++': 'Dark Experience Replay (DER++)',
+            'mer': 'Meta Experience Replay (MER)',
+            'si': 'Synaptic Intelligence (SI)',
+            'lwf': 'Learning Without Forgetting (LwF)',
+            'slca': 'Slow Learner Classifier Alignment (SLCA)',
+            'er_ace': 'Experience Replay ACE (ER-ACE)'
+        }
+        
+        if selection_mode == "Categorized (Frozen vs. Unfrozen)":
+            for strat_key, r_list in strategy_to_runs.items():
+                latest_run = r_list[0]
+                run_res = load_run_results(latest_run)
+                for k, v in run_res.items():
+                    if k.lower() == strat_key:
+                        metrics = v.get('metrics', {})
+                        avg_acc = metrics.get('Average Accuracy', 0.0)
+                        forgetting = metrics.get('Forgetting', 0.0)
+                        disp_name = leaderboard_display_names.get(strat_key, strat_key.upper())
+                        leaderboard_data.append({
+                            "Strategy": disp_name,
+                            "Run Folder": latest_run,
+                            "Average mIoU": float(avg_acc),
+                            "Forgetting": float(forgetting)
+                        })
+                        break
+        else:
+            # Direct run folder mode
+            for strat, v in results.items():
+                metrics = v.get('metrics', {})
+                avg_acc = metrics.get('Average Accuracy', 0.0)
+                forgetting = metrics.get('Forgetting', 0.0)
+                disp_name = leaderboard_display_names.get(strat.lower(), strat.upper())
+                leaderboard_data.append({
+                    "Strategy": disp_name,
+                    "Run Folder": selected_run,
+                    "Average mIoU": float(avg_acc),
+                    "Forgetting": float(forgetting)
+                })
+                
+        if leaderboard_data:
+            import pandas as pd
+            df_leader = pd.DataFrame(leaderboard_data)
+            
+            col_sort1, col_sort2 = st.columns([1, 2])
+            with col_sort1:
+                sort_by = st.selectbox(
+                    "Rank Strategies By:",
+                    ["Average mIoU (Highest First)", "Forgetting (Lowest First)"],
+                    key="leaderboard_sort_by"
+                )
+                
+            if sort_by == "Average mIoU (Highest First)":
+                df_leader = df_leader.sort_values(by="Average mIoU", ascending=False)
+            else:
+                df_leader = df_leader.sort_values(by="Forgetting", ascending=True)
+                
+            df_leader = df_leader.reset_index(drop=True)
+            df_leader.index = df_leader.index + 1
+            df_leader.index.name = "Rank"
+            
+            def highlight_min_max(s):
+                if s.name == 'Average mIoU':
+                    is_best = s == s.max()
+                    return ['background-color: rgba(16, 185, 129, 0.2); font-weight: bold;' if v else '' for v in is_best]
+                elif s.name == 'Forgetting':
+                    is_best = s == s.min()
+                    return ['background-color: rgba(16, 185, 129, 0.2); font-weight: bold;' if v else '' for v in is_best]
+                return ['' for _ in s]
+                
+            st.dataframe(
+                df_leader.style.apply(highlight_min_max, subset=["Average mIoU", "Forgetting"]).format({
+                    "Average mIoU": "{:.4f}",
+                    "Forgetting": "{:.4f}"
+                }),
+                use_container_width=True
+            )
+        else:
+            st.info("No strategies available for comparison.")
+            
+        st.markdown("---")
 
         # Double column layout for accuracy heatmaps and metrics matrices
         col_left, col_right = st.columns([1, 1])
@@ -384,9 +476,37 @@ with tab_inference:
     if not checkpoints:
         st.info("No trained checkpoint `.pth` files found in this run directory.")
     else:
+        # Filter checkpoints to match active strategy
+        filtered_checkpoints = []
+        if "baseline_model.pth" in checkpoints:
+            filtered_checkpoints.append("baseline_model.pth")
+            
+        if selected_strategy:
+            strategy_name_mapping = {
+                'naive': 'Naive_Fine-tuning',
+                'er': 'Experience_Replay',
+                'der++': 'Dark_Experience_Replay',
+                'mer': 'Meta_Experience_Replay',
+                'si': 'Synaptic_Intelligence',
+                'lwf': 'Learning_Without_Forgetting',
+                'slca': 'Slow_Learner_Classifier_Alignment',
+                'er_ace': 'Experience_Replay_ACE'
+            }
+            pattern = strategy_name_mapping.get(selected_strategy.lower(), selected_strategy)
+            pattern_clean = pattern.replace(' ', '_').lower()
+            
+            for ckpt in checkpoints:
+                if pattern_clean in ckpt.replace(' ', '_').lower():
+                    filtered_checkpoints.append(ckpt)
+        else:
+            filtered_checkpoints = checkpoints
+            
+        if not filtered_checkpoints:
+            filtered_checkpoints = checkpoints
+            
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
-            selected_ckpt = st.selectbox("Select Model Checkpoint (.pth)", sorted(checkpoints))
+            selected_ckpt = st.selectbox("Select Model Checkpoint (.pth)", sorted(list(set(filtered_checkpoints))))
         with col_c2:
             conf_threshold = st.slider("Prediction Threshold Filter", 0.0, 1.0, 0.5, 0.05)
 
