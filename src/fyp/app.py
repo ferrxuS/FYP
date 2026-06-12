@@ -64,7 +64,7 @@ st.markdown("""
 
 # App Header
 st.markdown('<div class="main-title">🏗️ Continual Learning Container Defect Segmenter</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">FYP Evaluation and Interactive Inference System on Frozen DINOv3 Backbone</div>', unsafe_allow_html=True)
+subtitle_placeholder = st.empty()
 
 # Helper function to scan available runs
 def get_available_runs():
@@ -74,6 +74,27 @@ def get_available_runs():
             if path.is_dir() and path.name.startswith("run_"):
                 runs.append(path.name)
     return sorted(runs, key=lambda x: int(x.split("_")[1]), reverse=True)
+
+# Helper function to check run type (Frozen vs. Unfrozen)
+@st.cache_data
+def get_run_type(run_name):
+    run_dir = SAVE_DIR / run_name
+    if not run_dir.exists():
+        return "Unknown"
+    
+    pth_files = list(run_dir.glob("*.pth"))
+    if not pth_files:
+        return "Frozen"
+        
+    try:
+        # Load weights on CPU to check keys without consuming GPU memory
+        state_dict = torch.load(pth_files[0], map_location="cpu")
+        has_backbone = any("backbone" in k for k in state_dict.keys())
+        return "Unfrozen" if has_backbone else "Frozen"
+    except Exception:
+        # Fallback to file size check
+        size_mb = pth_files[0].stat().st_size / (1024 * 1024)
+        return "Unfrozen" if size_mb > 50.0 else "Frozen"
 
 # Helper function to load results
 def load_run_results(run_name):
@@ -91,7 +112,7 @@ def load_run_results(run_name):
     return results
 
 # Helper function to load selected model weights
-@st.cache_resource
+@st.cache_resource(max_entries=1)
 def load_pytorch_model(run_name, checkpoint_name):
     checkpoint_path = SAVE_DIR / run_name / checkpoint_name
     model = ContainerDefectSegmenter(
@@ -117,16 +138,92 @@ if not runs:
     st.sidebar.error("No training runs found in `models/` folder. Please execute training first.")
     st.stop()
 
-selected_run = st.sidebar.selectbox("Select Experiment Run", runs)
-results = load_run_results(selected_run)
+# Selection Mode
+selection_mode = st.sidebar.radio(
+    "Run Selection Mode",
+    ["Categorized (Frozen vs. Unfrozen)", "Direct Run Folder"],
+    help="Select how you want to filter and search for your experiment runs."
+)
 
-# Get available strategies in that run
-available_strategies = list(results.keys())
-if not available_strategies:
-    st.sidebar.warning(f"No completed CL JSON results found for {selected_run}")
+if selection_mode == "Categorized (Frozen vs. Unfrozen)":
+    backbone_status = st.sidebar.selectbox("Backbone Status", ["Frozen", "Unfrozen"])
+    
+    # 1. Find all runs matching this backbone status
+    matching_runs = []
+    for r in runs:
+        if get_run_type(r) == backbone_status:
+            matching_runs.append(r)
+            
+    if not matching_runs:
+        st.sidebar.warning(f"No runs found categorized as {backbone_status}")
+        st.stop()
+        
+    # 2. Find all unique strategies across these matching runs
+    strategy_to_runs = {}
+    for r in matching_runs:
+        run_res = load_run_results(r)
+        for strat in run_res.keys():
+            strat_lower = strat.lower()
+            if strat_lower not in strategy_to_runs:
+                strategy_to_runs[strat_lower] = []
+            strategy_to_runs[strat_lower].append(r)
+            
+    if not strategy_to_runs:
+        st.sidebar.warning(f"No strategy results found for {backbone_status} runs.")
+        st.stop()
+        
+    # Mapping display names to keys
+    strategy_display_names = {
+        'naive': 'Naive Fine-tuning',
+        'er': 'Experience Replay (ER)',
+        'der++': 'Dark Experience Replay (DER++)',
+        'mer': 'Meta Experience Replay (MER)',
+        'si': 'Synaptic Intelligence (SI)',
+        'lwf': 'Learning Without Forgetting (LwF)',
+        'slca': 'Slow Learner Classifier Alignment (SLCA)',
+        'er_ace': 'Experience Replay ACE (ER-ACE)'
+    }
+    
+    available_strat_keys = sorted(list(strategy_to_runs.keys()))
+    strat_options = []
+    strat_key_map = {}
+    for k in available_strat_keys:
+        disp = strategy_display_names.get(k, k.upper())
+        strat_options.append(disp)
+        strat_key_map[disp] = k
+        
+    selected_strat_disp = st.sidebar.selectbox("Select Model / Strategy", strat_options)
+    selected_strat_key = strat_key_map[selected_strat_disp]
+    
+    # Select the latest run containing this strategy (runs are sorted descending)
+    selected_run = strategy_to_runs[selected_strat_key][0]
+    run_type = backbone_status
+    
+    results = load_run_results(selected_run)
+    available_strategies = list(results.keys())
+    
     selected_strategy = None
+    for k in results.keys():
+        if k.lower() == selected_strat_key:
+            selected_strategy = k
+            break
 else:
-    selected_strategy = st.sidebar.selectbox("Active Strategy for Analytics", available_strategies)
+    selected_run = st.sidebar.selectbox("Select Experiment Run", runs)
+    run_type = get_run_type(selected_run)
+    
+    results = load_run_results(selected_run)
+    available_strategies = list(results.keys())
+    if not available_strategies:
+        st.sidebar.warning(f"No completed CL JSON results found for {selected_run}")
+        selected_strategy = None
+    else:
+        selected_strategy = st.sidebar.selectbox("Active Strategy for Analytics", available_strategies)
+
+# Render subtitle dynamically based on selected run type
+subtitle_placeholder.markdown(
+    f'<div class="subtitle">FYP Evaluation and Interactive Inference System ({run_type} DINOv3 Backbone)</div>', 
+    unsafe_allow_html=True
+)
 
 # Tab separation
 tab_analytics, tab_inference = st.tabs(["CL Analytics & Comparisons", "Inference Playpen"])
