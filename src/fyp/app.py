@@ -309,6 +309,70 @@ with tab_analytics:
                 """, unsafe_allow_html=True)
 
         st.markdown("---")
+
+        # Double column layout for accuracy heatmaps and metrics matrices
+        col_left, col_right = st.columns([1, 1])
+
+        with col_left:
+            st.markdown(f"#### Accuracy Heatmap Matrix - {selected_strategy.upper()}")
+            matrix = np.array(results[selected_strategy]['metrics']['Accuracy Matrix'])
+            
+            fig, ax = plt.subplots(figsize=(7, 5))
+            mask = np.triu(np.ones_like(matrix, dtype=bool), k=1)
+            sns.heatmap(
+                matrix,
+                mask=mask,
+                annot=True,
+                fmt='.3f',
+                cmap='RdYlGn',
+                vmin=0,
+                vmax=1,
+                cbar_kws={'label': 'mIoU'},
+                square=True,
+                ax=ax
+            )
+            ax.set_title(f'Accuracy Matrix: {selected_strategy.upper()}', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Task Evaluated On')
+            ax.set_ylabel('After Training Task')
+            tick_labels = [f'Task {i+1}' for i in range(matrix.shape[0])]
+            ax.set_xticklabels(tick_labels)
+            ax.set_yticklabels(tick_labels, rotation=0)
+            plt.tight_layout()
+            st.pyplot(fig)
+
+        with col_right:
+            st.markdown("#### Task Performance Retention Curves")
+            fig2, ax2 = plt.subplots(figsize=(7, 5))
+            num_tasks = matrix.shape[0]
+            
+            for task_id in range(num_tasks):
+                performance = []
+                x_points = []
+                for train_task in range(task_id, num_tasks):
+                    if matrix[train_task, task_id] > 0:
+                        performance.append(matrix[train_task, task_id])
+                        x_points.append(train_task + 1)
+                
+                ax2.plot(
+                    x_points,
+                    performance,
+                    marker='o',
+                    linewidth=2.5,
+                    markersize=6,
+                    label=f'Task {task_id + 1} ({DEFECT_CATEGORIES[task_id+1]})'
+                )
+            
+            ax2.set_xlabel('After Training Task')
+            ax2.set_ylabel('mIoU Score')
+            ax2.set_title('Retrospective Performance Curve', fontsize=12, fontweight='bold')
+            ax2.legend(loc='best')
+            ax2.grid(True, alpha=0.3)
+            ax2.set_xticks(range(1, num_tasks + 1))
+            ax2.set_ylim([0, 1])
+            plt.tight_layout()
+            st.pyplot(fig2)
+
+        st.markdown("---")
         
         # --- STRATEGY LEADERBOARD ---
         st.markdown("### Strategy Performance Leaderboard")
@@ -399,70 +463,6 @@ with tab_analytics:
             )
         else:
             st.info("No strategies available for comparison.")
-            
-        st.markdown("---")
-
-        # Double column layout for accuracy heatmaps and metrics matrices
-        col_left, col_right = st.columns([1, 1])
-
-        with col_left:
-            st.markdown(f"#### Accuracy Heatmap Matrix - {selected_strategy.upper()}")
-            matrix = np.array(results[selected_strategy]['metrics']['Accuracy Matrix'])
-            
-            fig, ax = plt.subplots(figsize=(7, 5))
-            mask = np.triu(np.ones_like(matrix, dtype=bool), k=1)
-            sns.heatmap(
-                matrix,
-                mask=mask,
-                annot=True,
-                fmt='.3f',
-                cmap='RdYlGn',
-                vmin=0,
-                vmax=1,
-                cbar_kws={'label': 'mIoU'},
-                square=True,
-                ax=ax
-            )
-            ax.set_title(f'Accuracy Matrix: {selected_strategy.upper()}', fontsize=12, fontweight='bold')
-            ax.set_xlabel('Task Evaluated On')
-            ax.set_ylabel('After Training Task')
-            tick_labels = [f'Task {i+1}' for i in range(matrix.shape[0])]
-            ax.set_xticklabels(tick_labels)
-            ax.set_yticklabels(tick_labels, rotation=0)
-            plt.tight_layout()
-            st.pyplot(fig)
-
-        with col_right:
-            st.markdown("#### Task Performance Retention Curves")
-            fig2, ax2 = plt.subplots(figsize=(7, 5))
-            num_tasks = matrix.shape[0]
-            
-            for task_id in range(num_tasks):
-                performance = []
-                x_points = []
-                for train_task in range(task_id, num_tasks):
-                    if matrix[train_task, task_id] > 0:
-                        performance.append(matrix[train_task, task_id])
-                        x_points.append(train_task + 1)
-                
-                ax2.plot(
-                    x_points,
-                    performance,
-                    marker='o',
-                    linewidth=2.5,
-                    markersize=6,
-                    label=f'Task {task_id + 1} ({DEFECT_CATEGORIES[task_id+1]})'
-                )
-            
-            ax2.set_xlabel('After Training Task')
-            ax2.set_ylabel('mIoU Score')
-            ax2.set_title('Retrospective Performance Curve', fontsize=12, fontweight='bold')
-            ax2.legend(loc='best')
-            ax2.grid(True, alpha=0.3)
-            ax2.set_xticks(range(1, num_tasks + 1))
-            ax2.set_ylim([0, 1])
-            plt.tight_layout()
-            st.pyplot(fig2)
 
 # --- TAB 2: INFERENCE PLAYPEN ---
 with tab_inference:
@@ -485,12 +485,12 @@ with tab_inference:
             strategy_name_mapping = {
                 'naive': 'Naive_Fine-tuning',
                 'er': 'Experience_Replay',
-                'der++': 'Dark_Experience_Replay',
+                'der++': 'DER++',
                 'mer': 'Meta_Experience_Replay',
                 'si': 'Synaptic_Intelligence',
                 'lwf': 'Learning_Without_Forgetting',
-                'slca': 'Slow_Learner_Classifier_Alignment',
-                'er_ace': 'Experience_Replay_ACE'
+                'slca': 'SLCA',
+                'er_ace': 'ER-ACE'
             }
             pattern = strategy_name_mapping.get(selected_strategy.lower(), selected_strategy)
             pattern_clean = pattern.replace(' ', '_').lower()
