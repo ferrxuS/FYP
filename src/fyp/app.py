@@ -200,13 +200,19 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
     run_type = backbone_status
     
     results = load_run_results(selected_run)
-    available_strategies = list(results.keys())
     
     selected_strategy = None
     for k in results.keys():
         if k.lower() == selected_strat_key:
             selected_strategy = k
             break
+            
+    # Filter to only the selected strategy in Categorized mode
+    if selected_strategy:
+        available_strategies = [selected_strategy]
+        results = {selected_strategy: results[selected_strategy]}
+    else:
+        available_strategies = list(results.keys())
 else:
     selected_run = st.sidebar.selectbox("Select Experiment Run", runs)
     run_type = get_run_type(selected_run)
