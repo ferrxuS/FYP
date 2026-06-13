@@ -101,6 +101,15 @@ def get_run_type(run_name):
         size_mb = pth_files[0].stat().st_size / (1024 * 1024)
         return "Unfrozen" if size_mb > 50.0 else "Frozen"
 
+# Helper to dynamically find baseline model directories
+def get_joint_run_for_backbone(backbone_status):
+    runs = get_available_runs()
+    for r in runs:
+        if get_run_type(r) == backbone_status:
+            if (SAVE_DIR / r / "baseline_model.pth").exists():
+                return r
+    return "run_1" if backbone_status == "Frozen" else "run_14"
+
 # Helper function to load results
 def load_run_results(run_name):
     run_results_dir = RESULTS_DIR / run_name
@@ -692,42 +701,49 @@ with tab_inference:
 
     # Model checkpoints selection
     run_path = SAVE_DIR / selected_run
-    checkpoints = [p.name for p in run_path.iterdir() if p.suffix == ".pth"]
+    checkpoints = [p.name for p in run_path.iterdir() if p.suffix == ".pth"] if run_path.exists() else []
     
-    if not checkpoints:
-        st.info("No trained checkpoint `.pth` files found in this run directory.")
+    # Filter checkpoints to match active strategy
+    filtered_checkpoints = []
+    
+    # 1. Check if the active run has its own baseline_model.pth
+    if "baseline_model.pth" in checkpoints:
+        filtered_checkpoints.append("baseline_model.pth")
+        
+    # 2. Add the Joint Baseline (all data) if it exists in the designated run
+    joint_run_folder = get_joint_run_for_backbone(run_type)
+    if (SAVE_DIR / joint_run_folder / "baseline_model.pth").exists():
+        filtered_checkpoints.append("Joint Baseline (all data)")
+        
+    # 3. Add strategy checkpoints
+    if selected_strategy:
+        strategy_name_mapping = {
+            'naive': 'Naive_Fine-tuning',
+            'er': 'Experience_Replay',
+            'der++': 'DER++',
+            'mer': 'Meta_Experience_Replay',
+            'si': 'Synaptic_Intelligence',
+            'lwf': 'Learning_Without_Forgetting',
+            'slca': 'SLCA',
+            'er_ace': 'ER-ACE'
+        }
+        pattern = strategy_name_mapping.get(selected_strategy.lower(), selected_strategy)
+        pattern_clean = pattern.replace(' ', '_').lower()
+        
+        for ckpt in checkpoints:
+            if pattern_clean in ckpt.replace(' ', '_').lower():
+                filtered_checkpoints.append(ckpt)
     else:
-        # Filter checkpoints to match active strategy
-        filtered_checkpoints = []
-        if "baseline_model.pth" in checkpoints:
-            filtered_checkpoints.append("baseline_model.pth")
-            
-        if selected_strategy:
-            strategy_name_mapping = {
-                'naive': 'Naive_Fine-tuning',
-                'er': 'Experience_Replay',
-                'der++': 'DER++',
-                'mer': 'Meta_Experience_Replay',
-                'si': 'Synaptic_Intelligence',
-                'lwf': 'Learning_Without_Forgetting',
-                'slca': 'SLCA',
-                'er_ace': 'ER-ACE'
-            }
-            pattern = strategy_name_mapping.get(selected_strategy.lower(), selected_strategy)
-            pattern_clean = pattern.replace(' ', '_').lower()
-            
-            for ckpt in checkpoints:
-                if pattern_clean in ckpt.replace(' ', '_').lower():
-                    filtered_checkpoints.append(ckpt)
-        else:
-            filtered_checkpoints = checkpoints
-            
-        if not filtered_checkpoints:
-            filtered_checkpoints = checkpoints
-            
+        filtered_checkpoints.extend(checkpoints)
+        
+    filtered_checkpoints = sorted(list(set(filtered_checkpoints)))
+    
+    if not filtered_checkpoints:
+        st.info("No trained checkpoint `.pth` files found.")
+    else:
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
-            selected_ckpt = st.selectbox("Select Model Checkpoint (.pth)", sorted(list(set(filtered_checkpoints))))
+            selected_ckpt = st.selectbox("Select Model Checkpoint (.pth)", filtered_checkpoints)
         with col_c2:
             conf_threshold = st.slider("Prediction Threshold Filter", 0.0, 1.0, 0.5, 0.05)
 
@@ -802,7 +818,14 @@ with tab_inference:
             image, mask, filename = dataset[image_idx]
 
             # Trigger PyTorch model loading
-            model, err = load_pytorch_model(selected_run, selected_ckpt)
+            if selected_ckpt == "Joint Baseline (all data)":
+                model_run = get_joint_run_for_backbone(run_type)
+                model_ckpt = "baseline_model.pth"
+            else:
+                model_run = selected_run
+                model_ckpt = selected_ckpt
+                
+            model, err = load_pytorch_model(model_run, model_ckpt)
 
             if err:
                 st.error(f"Error loading model weights: {err}")
