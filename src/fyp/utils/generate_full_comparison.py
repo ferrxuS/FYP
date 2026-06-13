@@ -82,6 +82,15 @@ def get_run_type(run_name: str, project_root: Path) -> str:
         size_mb = pth_files[0].stat().st_size / (1024 * 1024)
         return "Unfrozen" if size_mb > 50.0 else "Frozen"
 
+def clean_strategy_name(key: str) -> str:
+    import re
+    # Convert to lowercase
+    k = key.lower()
+    # Strip any trailing _run_X or _runX or _run or _run_run_X
+    k = re.sub(r'_(run_\d+|run\d+|run)$', '', k)
+    k = re.sub(r'_(run)$', '', k)
+    return k
+
 def plot_combined_comparison(strategy_results: dict, save_path: Path, project_root: Path):
     """Plot accuracy, forgetting, and backward transfer comparison side-by-side"""
     import numpy as np
@@ -96,12 +105,7 @@ def plot_combined_comparison(strategy_results: dict, save_path: Path, project_ro
             continue
             
         # Extract clean strategy name
-        if "_" in key and ("run_" in key or "run" in key):
-            strat_name = key.rsplit("_", 1)[0]
-        else:
-            strat_name = key
-            
-        strat_name = strat_name.lower()
+        strat_name = clean_strategy_name(key)
         run_name = data.get('run_dir', 'Direct')
         
         # Determine run type
@@ -217,12 +221,8 @@ def plot_combined_comparison(strategy_results: dict, save_path: Path, project_ro
 
         for name in sorted(strategy_results.keys()):
             results = strategy_results[name]
-            if "_" in name and ("run_" in name or "run" in name):
-                base_name, _ = name.rsplit("_", 1)
-                label = strategy_display_names.get(base_name.lower(), base_name.upper())
-            else:
-                label = strategy_display_names.get(name.lower(), name.upper())
-                
+            label_key = clean_strategy_name(name)
+            label = strategy_display_names.get(label_key, label_key.upper())
             strategies.append(label)
             avg_accs.append(results['metrics']['Average Accuracy'])
             forgettings.append(results['metrics']['Forgetting'])
@@ -284,11 +284,8 @@ def plot_combined_comparison(strategy_results: dict, save_path: Path, project_ro
         backbone_type = get_run_type(run_name, project_root)
         
         # Clean display name
-        if "_" in name and ("run_" in name or "run" in name):
-            base_name = name.rsplit("_", 1)[0]
-        else:
-            base_name = name
-        disp_name = strategy_display_names.get(base_name.lower(), base_name.upper())
+        label_key = clean_strategy_name(name)
+        disp_name = strategy_display_names.get(label_key, label_key.upper())
         
         print(f"| {disp_name:<25} | {run_name:<12} | {backbone_type:<10} | {avg_acc:<12.4f} | {forgetting:<10.4f} | {bwt:<10.4f} |")
     print("="*60 + "\n")
