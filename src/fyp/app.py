@@ -713,7 +713,8 @@ with tab_inference:
     # 2. Add the Joint Baseline (all data) if it exists in the designated run
     joint_run_folder = get_joint_run_for_backbone(run_type)
     if (SAVE_DIR / joint_run_folder / "baseline_model.pth").exists():
-        filtered_checkpoints.append("Joint Baseline (all data)")
+        joint_label = f"Joint Baseline - {run_type} (all data)"
+        filtered_checkpoints.append(joint_label)
         
     # 3. Add strategy checkpoints
     if selected_strategy:
@@ -818,7 +819,7 @@ with tab_inference:
             image, mask, filename = dataset[image_idx]
 
             # Trigger PyTorch model loading
-            if selected_ckpt == "Joint Baseline (all data)":
+            if "Joint Baseline" in selected_ckpt:
                 model_run = get_joint_run_for_backbone(run_type)
                 model_ckpt = "baseline_model.pth"
             else:
