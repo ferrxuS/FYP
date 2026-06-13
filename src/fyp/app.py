@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torch.nn.functional as F
 
-# Import fyp modules safely
 from fyp.models.segmenter import ContainerDefectSegmenter
 from fyp.config import (
     SAVE_DIR, RESULTS_DIR, DEVICE, BACKBONE, NUM_CLASSES, 
@@ -16,7 +15,6 @@ from fyp.config import (
 )
 from fyp.data.dataset import ContainerDefectDataset
 
-# Page setup with wide, premium layout
 st.set_page_config(
     page_title="Continual Learning Container Defect Segmentation Dashboard",
     page_icon="🏗️",
@@ -24,7 +22,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom modern CSS styling for rich aesthetics
 st.markdown("""
 <style>
     .main-title {
@@ -67,11 +64,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# App Header
 st.markdown('<div class="main-title">🏗️ Continual Learning Container Defect Segmenter</div>', unsafe_allow_html=True)
 subtitle_placeholder = st.empty()
 
-# Helper function to scan available runs
 def get_available_runs():
     runs = []
     if SAVE_DIR.exists():
@@ -80,7 +75,6 @@ def get_available_runs():
                 runs.append(path.name)
     return sorted(runs, key=lambda x: int(x.split("_")[1]), reverse=True)
 
-# Helper function to check run type (Frozen vs. Unfrozen)
 @st.cache_data
 def get_run_type(run_name):
     run_dir = SAVE_DIR / run_name
@@ -92,16 +86,13 @@ def get_run_type(run_name):
         return "Frozen"
         
     try:
-        # Load weights on CPU to check keys without consuming GPU memory
         state_dict = torch.load(pth_files[0], map_location="cpu")
         has_backbone = any("backbone" in k for k in state_dict.keys())
         return "Unfrozen" if has_backbone else "Frozen"
     except Exception:
-        # Fallback to file size check
         size_mb = pth_files[0].stat().st_size / (1024 * 1024)
         return "Unfrozen" if size_mb > 50.0 else "Frozen"
 
-# Helper to dynamically find baseline model directories
 def get_joint_run_for_backbone(backbone_status):
     runs = get_available_runs()
     for r in runs:
@@ -110,7 +101,6 @@ def get_joint_run_for_backbone(backbone_status):
                 return r
     return "run_1" if backbone_status == "Frozen" else "run_14"
 
-# Helper function to load results
 def load_run_results(run_name):
     run_results_dir = RESULTS_DIR / run_name
     results = {}
@@ -125,7 +115,6 @@ def load_run_results(run_name):
                     pass
     return results
 
-# Helper function to load selected model weights
 @st.cache_resource(max_entries=1)
 def load_pytorch_model(run_name, checkpoint_name):
     checkpoint_path = SAVE_DIR / run_name / checkpoint_name
@@ -136,7 +125,6 @@ def load_pytorch_model(run_name, checkpoint_name):
         decoder_hidden_dim=DECODER_HIDDEN_DIM
     )
     try:
-        # Load weights on cpu or device (strict=False supports pruned checkpoints)
         state_dict = torch.load(checkpoint_path, map_location=DEVICE)
         model.load_state_dict(state_dict, strict=False)
         model.to(DEVICE)
@@ -145,14 +133,12 @@ def load_pytorch_model(run_name, checkpoint_name):
     except Exception as e:
         return None, str(e)
 
-# Sidebar controls
 st.sidebar.markdown("### ⚙️ Benchmark Controls")
 runs = get_available_runs()
 if not runs:
     st.sidebar.error("No training runs found in `models/` folder. Please execute training first.")
     st.stop()
 
-# Selection Mode
 selection_mode = st.sidebar.radio(
     "Run Selection Mode",
     ["Categorized (Frozen vs. Unfrozen)", "Cross-Run Backbone Comparison", "Direct Run Folder"],
@@ -162,7 +148,6 @@ selection_mode = st.sidebar.radio(
 if selection_mode == "Categorized (Frozen vs. Unfrozen)":
     backbone_status = st.sidebar.selectbox("Backbone Status", ["Frozen", "Unfrozen"])
     
-    # 1. Find all runs matching this backbone status
     matching_runs = []
     for r in runs:
         if get_run_type(r) == backbone_status:
@@ -172,7 +157,6 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
         st.sidebar.warning(f"No runs found categorized as {backbone_status}")
         st.stop()
         
-    # 2. Find all unique strategies across these matching runs
     strategy_to_runs = {}
     for r in matching_runs:
         run_res = load_run_results(r)
@@ -186,7 +170,6 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
         st.sidebar.warning(f"No strategy results found for {backbone_status} runs.")
         st.stop()
         
-    # Mapping display names to keys
     strategy_display_names = {
         'naive': 'Naive Fine-tuning',
         'er': 'Experience Replay (ER)',
@@ -206,14 +189,12 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
         strat_options.append(disp)
         strat_key_map[disp] = k
         
-    # Analysis type choice
     analysis_type = st.sidebar.selectbox("Analysis Type", ["Single Strategy", "Compare Strategies"])
     
     if analysis_type == "Single Strategy":
         selected_strat_disp = st.sidebar.selectbox("Select Model / Strategy", strat_options)
         selected_strat_key = strat_key_map[selected_strat_disp]
         
-        # Select the latest run containing this strategy (runs are sorted descending)
         selected_run = strategy_to_runs[selected_strat_key][0]
         run_type = backbone_status
         
@@ -225,14 +206,12 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
                 selected_strategy = k
                 break
                 
-        # Filter to only the selected strategy
         if selected_strategy:
             available_strategies = [selected_strategy]
             results = {selected_strategy: results[selected_strategy]}
         else:
             available_strategies = list(results.keys())
     else:
-        # Compare Strategies mode
         selected_strats_disp = st.sidebar.multiselect(
             "Select Strategies to Compare", 
             strat_options,
@@ -243,12 +222,11 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
             st.sidebar.warning("Please select at least one strategy to compare.")
             st.stop()
             
-        # Build combined results from the latest runs of each selected strategy
         results = {}
         strategy_to_run_resolved = {}
         for disp in selected_strats_disp:
             skey = strat_key_map[disp]
-            run_resolved = strategy_to_runs[skey][0] # latest run for this strategy
+            run_resolved = strategy_to_runs[skey][0]
             run_res = load_run_results(run_resolved)
             for k in run_res.keys():
                 if k.lower() == skey:
@@ -258,7 +236,6 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
                     
         available_strategies = list(results.keys())
         
-        # Active strategy for detailed heatmaps and curves
         selected_strategy = st.sidebar.selectbox(
             "Active Strategy for Details", 
             available_strategies,
@@ -269,7 +246,6 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
         run_type = backbone_status
 
 elif selection_mode == "Cross-Run Backbone Comparison":
-    # Group runs by their backbone status: "Frozen" or "Unfrozen"
     strategy_to_frozen_runs = {}
     strategy_to_unfrozen_runs = {}
     
@@ -285,7 +261,7 @@ elif selection_mode == "Cross-Run Backbone Comparison":
     }
     
     for r in runs:
-        rtype = get_run_type(r) # "Frozen" or "Unfrozen"
+        rtype = get_run_type(r)
         run_res = load_run_results(r)
         for strat in run_res.keys():
             strat_lower = strat.lower()
@@ -298,7 +274,6 @@ elif selection_mode == "Cross-Run Backbone Comparison":
                     strategy_to_unfrozen_runs[strat_lower] = []
                 strategy_to_unfrozen_runs[strat_lower].append(r)
                 
-    # Intersection of strategies that are present in both Frozen and Unfrozen runs
     common_strats = sorted(list(set(strategy_to_frozen_runs.keys()).intersection(set(strategy_to_unfrozen_runs.keys()))))
     
     if not common_strats:
@@ -315,18 +290,15 @@ elif selection_mode == "Cross-Run Backbone Comparison":
     selected_strat_disp = st.sidebar.selectbox("Select Strategy to Compare", strat_options)
     selected_strat_key = strat_key_map[selected_strat_disp]
     
-    # Let user select which run for Frozen and which for Unfrozen
     frozen_runs_for_strat = strategy_to_frozen_runs[selected_strat_key]
     unfrozen_runs_for_strat = strategy_to_unfrozen_runs[selected_strat_key]
     
     selected_frozen_run = st.sidebar.selectbox("Select Frozen Run", frozen_runs_for_strat)
     selected_unfrozen_run = st.sidebar.selectbox("Select Unfrozen Run", unfrozen_runs_for_strat)
     
-    # Load both results
     frozen_full_res = load_run_results(selected_frozen_run)
     unfrozen_full_res = load_run_results(selected_unfrozen_run)
     
-    # Extract the target strategy results
     frozen_strat_key = None
     for k in frozen_full_res.keys():
         if k.lower() == selected_strat_key:
@@ -348,12 +320,10 @@ elif selection_mode == "Cross-Run Backbone Comparison":
         'unfrozen_metrics': unfrozen_full_res[unfrozen_strat_key]
     }
     
-    # For compatibility with standard metrics mapping
     results = {frozen_strat_key: frozen_full_res[frozen_strat_key]}
     available_strategies = [frozen_strat_key]
     selected_strategy = frozen_strat_key
     
-    # Active run for inference playpen
     active_inference_run = st.sidebar.radio("Active Run for Inference Playpen", ["Frozen Run", "Unfrozen Run"])
     if active_inference_run == "Frozen Run":
         selected_run = selected_frozen_run
@@ -374,16 +344,13 @@ else:
     else:
         selected_strategy = st.sidebar.selectbox("Active Strategy for Analytics", available_strategies)
 
-# Render subtitle dynamically based on selected run type
 subtitle_placeholder.markdown(
     f'<div class="subtitle">FYP Evaluation and Interactive Inference System ({run_type} DINOv3 Backbone)</div>', 
     unsafe_allow_html=True
 )
 
-# Tab separation
 tab_analytics, tab_inference = st.tabs(["CL Analytics & Comparisons", "Inference Playpen"])
 
-# Category descriptions for defect/repair annotations
 DEFECT_CATEGORIES = {
     0: "Background",
     1: "Paint Repair (PAINT-P)",
@@ -393,13 +360,11 @@ DEFECT_CATEGORIES = {
     5: "Wash Repair (WASH-W)"
 }
 
-# --- TAB 1: ANALYTICS ---
 with tab_analytics:
     if selection_mode == "Cross-Run Backbone Comparison":
         st.markdown(f"### 🔄 Backbone Comparison: **{cross_comparison_data['strategy_name']}**")
         st.write("Comparing performance metrics between **Frozen** and **Unfrozen** backbone configurations.")
         
-        # Summary cards side-by-side
         col_card1, col_card2 = st.columns(2)
         with col_card1:
             avg_acc_f = cross_comparison_data['frozen_metrics']['metrics'].get('Average Accuracy', 0)
@@ -427,10 +392,8 @@ with tab_analytics:
             
         st.markdown("---")
 
-        # Double column layout for accuracy heatmaps
         col_left, col_right = st.columns([1, 1])
 
-        # Frozen Matrix
         matrix_f = np.array(cross_comparison_data['frozen_metrics']['metrics']['Accuracy Matrix'])
         with col_left:
             st.markdown("#### ❄️ Frozen Backbone Heatmap")
@@ -457,7 +420,6 @@ with tab_analytics:
             plt.tight_layout()
             st.pyplot(fig_f)
             
-        # Unfrozen Matrix
         matrix_u = np.array(cross_comparison_data['unfrozen_metrics']['metrics']['Accuracy Matrix'])
         with col_right:
             st.markdown("#### 🔥 Unfrozen Backbone Heatmap")
@@ -486,10 +448,8 @@ with tab_analytics:
             
         st.markdown("---")
 
-        # Comparison plot
         st.markdown("#### 📈 Average mIoU Progression (Frozen vs. Unfrozen)")
         
-        # Calculate step-by-step average accuracies
         frozen_steps = []
         unfrozen_steps = []
         
@@ -521,7 +481,6 @@ with tab_analytics:
     else:
         st.markdown(f"### Comparative Overview for **{selected_run.upper()}**")
         
-        # Strategy overview cards side-by-side
         cols = st.columns(len(available_strategies))
         for i, strat in enumerate(available_strategies):
             strat_data = results[strat]['metrics']
@@ -540,7 +499,6 @@ with tab_analytics:
 
         st.markdown("---")
 
-        # Double column layout for accuracy heatmaps and metrics matrices
         col_left, col_right = st.columns([1, 1])
 
         with col_left:
@@ -604,14 +562,11 @@ with tab_analytics:
 
         st.markdown("---")
         
-        # --- STRATEGY LEADERBOARD ---
         st.markdown("### Strategy Performance Leaderboard")
         st.write("Rank and compare all evaluated continual learning strategies under the active backbone status.")
         
-        # Gather data for leaderboard
         leaderboard_data = []
         
-        # Build mapping of display names
         leaderboard_display_names = {
             'naive': 'Naive Fine-tuning',
             'er': 'Experience Replay (ER)',
@@ -641,7 +596,6 @@ with tab_analytics:
                         })
                         break
         else:
-            # Direct run folder mode
             for strat, v in results.items():
                 metrics = v.get('metrics', {})
                 avg_acc = metrics.get('Average Accuracy', 0.0)
@@ -694,29 +648,23 @@ with tab_analytics:
         else:
             st.info("No strategies available for comparison.")
 
-# --- TAB 2: INFERENCE PLAYPEN ---
 with tab_inference:
     st.markdown("### Real-Time Defect Segmentation Inference Playpen")
     st.write("Test your trained continual learning models dynamically on validation images.")
 
-    # Model checkpoints selection
     run_path = SAVE_DIR / selected_run
     checkpoints = [p.name for p in run_path.iterdir() if p.suffix == ".pth"] if run_path.exists() else []
     
-    # Filter checkpoints to match active strategy
     filtered_checkpoints = []
     
-    # 1. Check if the active run has its own baseline_model.pth
     if "baseline_model.pth" in checkpoints:
         filtered_checkpoints.append("baseline_model.pth")
         
-    # 2. Add the Joint Baseline (all data) if it exists in the designated run
     joint_run_folder = get_joint_run_for_backbone(run_type)
     if (SAVE_DIR / joint_run_folder / "baseline_model.pth").exists():
         joint_label = f"Joint Baseline - {run_type} (all data)"
         filtered_checkpoints.append(joint_label)
         
-    # 3. Add strategy checkpoints
     if selected_strategy:
         strategy_name_mapping = {
             'naive': 'Naive_Fine-tuning',
@@ -748,18 +696,15 @@ with tab_inference:
         with col_c2:
             conf_threshold = st.slider("Prediction Threshold Filter", 0.0, 1.0, 0.5, 0.05)
 
-        # Load validation dataset dynamically
         if not VALID_DIR.exists():
             st.error(f"Validation directory not found at {VALID_DIR}")
         else:
-            # Load dataset cleanly
             @st.cache_resource
             def get_cached_dataset():
                 return ContainerDefectDataset(VALID_DIR)
             
             dataset = get_cached_dataset()
             
-            # Identify pure and all indices
             @st.cache_data
             def get_dataset_split_indices(_dataset):
                 all_idx = list(range(len(_dataset)))
@@ -778,7 +723,6 @@ with tab_inference:
 
             pure_indices, all_indices = get_dataset_split_indices(dataset)
 
-            # Filter selection
             col_filter1, col_filter2 = st.columns([1, 1])
             with col_filter1:
                 val_filter = st.selectbox(
@@ -792,7 +736,6 @@ with tab_inference:
             if "image_index_val" not in st.session_state:
                 st.session_state["image_index_val"] = 0
                 
-            # Reset/clamp index if switching filters causes index out of range
             if st.session_state["image_index_val"] > max_idx:
                 st.session_state["image_index_val"] = 0
 
@@ -809,16 +752,13 @@ with tab_inference:
                     st.session_state["image_index_val"] = image_sub_idx
                     st.rerun()
             with col_sel2:
-                # Random selector button
                 if st.button("Random Validation Image"):
                     st.session_state["image_index_val"] = int(np.random.randint(0, len(active_indices)))
                     st.rerun()
 
-            # Retrieve selected image and mask using active_indices mapping
             image_idx = active_indices[st.session_state["image_index_val"]]
             image, mask, filename = dataset[image_idx]
 
-            # Trigger PyTorch model loading
             if "Joint Baseline" in selected_ckpt:
                 model_run = get_joint_run_for_backbone(run_type)
                 model_ckpt = "baseline_model.pth"
@@ -831,32 +771,26 @@ with tab_inference:
             if err:
                 st.error(f"Error loading model weights: {err}")
             else:
-                # Run real-time inference
                 image_input = image.unsqueeze(0).to(DEVICE)
                 with torch.no_grad():
                     logits = model(image_input)
                     probabilities = F.softmax(logits, dim=1).cpu().squeeze(0)
                     predictions = torch.argmax(logits, dim=1).cpu().squeeze(0).numpy()
 
-                # Process original image for visualization
-                # Denormalize image back to range [0, 1]
                 mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
                 std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
                 image_denorm = image * std + mean
                 image_denorm = torch.clamp(image_denorm, 0, 1).permute(1, 2, 0).numpy()
 
-                # Generate clean color map overlay for defect channels
-                # Map colors: rust=red, structural=orange, paint=yellow, crack=purple, decal=blue
                 colors = [
-                    [0, 0, 0],       # Background (transparent)
-                    [239, 68, 68],   # 1: Paint Repair (Red)
-                    [245, 158, 11],  # 2: Patch Repair (Orange)
-                    [252, 211, 77],  # 3: Removal Repair (Yellow)
-                    [139, 92, 246],  # 4: Sealant Repair (Purple)
-                    [59, 130, 246]   # 5: Wash Repair (Blue)
+                    [0, 0, 0],
+                    [239, 68, 68],
+                    [245, 158, 11],
+                    [252, 211, 77],
+                    [139, 92, 246],
+                    [59, 130, 246]
                 ]
 
-                # Create colored overlays
                 mask_np = mask.squeeze(0).numpy()
                 gt_overlay = np.zeros((*mask_np.shape, 3), dtype=np.uint8)
                 pred_overlay = np.zeros((*predictions.shape, 3), dtype=np.uint8)
@@ -864,11 +798,9 @@ with tab_inference:
                 for c_id, color in enumerate(colors):
                     if c_id == 0: continue
                     gt_overlay[mask_np == c_id] = color
-                    # For predictions, filter out by confidence threshold of softmax
                     conf_mask = (predictions == c_id) & (probabilities[c_id].numpy() >= conf_threshold)
                     pred_overlay[conf_mask] = color
 
-                # Compute blending
                 gt_blended = np.copy(image_denorm)
                 pred_blended = np.copy(image_denorm)
                 alpha = 0.55
@@ -880,7 +812,6 @@ with tab_inference:
                     gt_blended[gt_class_mask] = (1 - alpha) * gt_blended[gt_class_mask] + alpha * (np.array(colors[c_id])/255.0)
                     pred_blended[pred_class_mask] = (1 - alpha) * pred_blended[pred_class_mask] + alpha * (np.array(colors[c_id])/255.0)
 
-                # Show side-by-side visualization
                 col_v1, col_v2, col_v3 = st.columns([1, 1, 1])
 
                 with col_v1:
@@ -890,7 +821,6 @@ with tab_inference:
                 with col_v3:
                     st.image(pred_blended, caption=f"Model Prediction ({selected_ckpt})", use_container_width=True)
 
-                # Display Color Legend
                 st.markdown("#### Color Legend Mapping")
                 legend_cols = st.columns(5)
                 for cat_id in range(1, 6):

@@ -35,25 +35,25 @@ SAVE_DIR = PROJECT_ROOT / "models"
 RESULTS_DIR = PROJECT_ROOT / "results"
 
 # Model Configuration
-BACKBONE = "vitl16"         # DINOv3 variant: vits16, vitb16, vitl16, vith16
-IMAGE_SIZE = 768            # must be divisible by PATCH_SIZE
+BACKBONE = "vitl16"        
+IMAGE_SIZE = 768            
 PATCH_SIZE = 16
 DECODER_HIDDEN_DIM = 256
-DROPOUT = 0.1               # Dropout probability
-UNFREEZE_LAST_N_BLOCKS = 0  # 0 = fully frozen backbone, N = unfreeze last N blocks
+DROPOUT = 0.1               
+UNFREEZE_LAST_N_BLOCKS = 0  
 
 # Training Configuration
 BATCH_SIZE = 8
-LEARNING_RATE = 5e-4        # Balanced for 10 epochs
-NUM_EPOCHS = 10             # Increased for full training
-SUBSET_SIZE = None          # Use full dataset
+LEARNING_RATE = 5e-4        
+NUM_EPOCHS = 10             
+SUBSET_SIZE = None          
 
 # Continual Learning Configuration
-NUM_TASKS = 5               # Test forgetting over multiple sequence steps
-MEMORY_SIZE = 500           # Replay buffer size for ER/DER (approx 15-20% of data)
-MER_BETA = 0.1              # within-batch Reptile LR
-MER_GAMMA = 0.1             # across-batch Reptile LR
-MER_BATCH_NUM = 1           # number of inner iterations per observe call
+NUM_TASKS = 5              
+MEMORY_SIZE = 500           
+MER_BETA = 0.1              
+MER_GAMMA = 0.1             
+MER_BATCH_NUM = 1
 
 # SI Hyperparameters (aimagelab/mammoth architecture)
 SI_C = 0.5                  # penalty weight - higher = more protection, less plasticity
@@ -68,5 +68,5 @@ SLCA_CA_EPOCHS = 5          # alignment epochs
 SLCA_LOGIT_NORM = 0.1       # logit L2 norm weight
 
 # Task Splitting Options
-IGNORE_COMPOSITE = False    # If True, skip images that have more than one type of defect
-ALLOW_REUSE = False         # If True, images with multiple defects can appear in multiple tasks
+IGNORE_COMPOSITE = False    
+ALLOW_REUSE = False         
