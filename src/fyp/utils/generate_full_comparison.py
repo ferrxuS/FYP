@@ -218,8 +218,8 @@ def plot_combined_comparison(strategy_results: dict, save_path: Path, project_ro
         for name in sorted(strategy_results.keys()):
             results = strategy_results[name]
             if "_" in name and ("run_" in name or "run" in name):
-                base_name, run_part = name.rsplit("_", 1)
-                label = f"{strategy_display_names.get(base_name.lower(), base_name.upper())} ({run_part.replace('run', 'Run ')})"
+                base_name, _ = name.rsplit("_", 1)
+                label = strategy_display_names.get(base_name.lower(), base_name.upper())
             else:
                 label = strategy_display_names.get(name.lower(), name.upper())
                 
