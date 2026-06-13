@@ -56,9 +56,14 @@ st.markdown("""
         text-transform: uppercase;
         font-weight: 600;
     }
-    .card-si { border-left-color: #EF4444; }
+    .card-naive { border-left-color: #6B7280; }
+    .card-er { border-left-color: #06B6D4; }
+    .card-derpp { border-left-color: #8B5CF6; }
     .card-mer { border-left-color: #10B981; }
-    .card-der { border-left-color: #8B5CF6; }
+    .card-si { border-left-color: #EF4444; }
+    .card-lwf { border-left-color: #F97316; }
+    .card-slca { border-left-color: #6366F1; }
+    .card-er-ace { border-left-color: #EC4899; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -95,6 +100,15 @@ def get_run_type(run_name):
         # Fallback to file size check
         size_mb = pth_files[0].stat().st_size / (1024 * 1024)
         return "Unfrozen" if size_mb > 50.0 else "Frozen"
+
+# Helper to dynamically find baseline model directories
+def get_joint_run_for_backbone(backbone_status):
+    runs = get_available_runs()
+    for r in runs:
+        if get_run_type(r) == backbone_status:
+            if (SAVE_DIR / r / "baseline_model.pth").exists():
+                return r
+    return "run_1" if backbone_status == "Frozen" else "run_14"
 
 # Helper function to load results
 def load_run_results(run_name):
@@ -141,7 +155,7 @@ if not runs:
 # Selection Mode
 selection_mode = st.sidebar.radio(
     "Run Selection Mode",
-    ["Categorized (Frozen vs. Unfrozen)", "Direct Run Folder"],
+    ["Categorized (Frozen vs. Unfrozen)", "Cross-Run Backbone Comparison", "Direct Run Folder"],
     help="Select how you want to filter and search for your experiment runs."
 )
 
@@ -253,6 +267,101 @@ if selection_mode == "Categorized (Frozen vs. Unfrozen)":
         
         selected_run = strategy_to_run_resolved[selected_strategy]
         run_type = backbone_status
+
+elif selection_mode == "Cross-Run Backbone Comparison":
+    # Group runs by their backbone status: "Frozen" or "Unfrozen"
+    strategy_to_frozen_runs = {}
+    strategy_to_unfrozen_runs = {}
+    
+    strategy_display_names = {
+        'naive': 'Naive Fine-tuning',
+        'er': 'Experience Replay (ER)',
+        'der++': 'Dark Experience Replay (DER++)',
+        'mer': 'Meta Experience Replay (MER)',
+        'si': 'Synaptic Intelligence (SI)',
+        'lwf': 'Learning Without Forgetting (LwF)',
+        'slca': 'Slow Learner Classifier Alignment (SLCA)',
+        'er_ace': 'Experience Replay ACE (ER-ACE)'
+    }
+    
+    for r in runs:
+        rtype = get_run_type(r) # "Frozen" or "Unfrozen"
+        run_res = load_run_results(r)
+        for strat in run_res.keys():
+            strat_lower = strat.lower()
+            if rtype == "Frozen":
+                if strat_lower not in strategy_to_frozen_runs:
+                    strategy_to_frozen_runs[strat_lower] = []
+                strategy_to_frozen_runs[strat_lower].append(r)
+            else:
+                if strat_lower not in strategy_to_unfrozen_runs:
+                    strategy_to_unfrozen_runs[strat_lower] = []
+                strategy_to_unfrozen_runs[strat_lower].append(r)
+                
+    # Intersection of strategies that are present in both Frozen and Unfrozen runs
+    common_strats = sorted(list(set(strategy_to_frozen_runs.keys()).intersection(set(strategy_to_unfrozen_runs.keys()))))
+    
+    if not common_strats:
+        st.sidebar.warning("No strategies found with both Frozen and Unfrozen run results.")
+        st.stop()
+        
+    strat_options = []
+    strat_key_map = {}
+    for k in common_strats:
+        disp = strategy_display_names.get(k, k.upper())
+        strat_options.append(disp)
+        strat_key_map[disp] = k
+        
+    selected_strat_disp = st.sidebar.selectbox("Select Strategy to Compare", strat_options)
+    selected_strat_key = strat_key_map[selected_strat_disp]
+    
+    # Let user select which run for Frozen and which for Unfrozen
+    frozen_runs_for_strat = strategy_to_frozen_runs[selected_strat_key]
+    unfrozen_runs_for_strat = strategy_to_unfrozen_runs[selected_strat_key]
+    
+    selected_frozen_run = st.sidebar.selectbox("Select Frozen Run", frozen_runs_for_strat)
+    selected_unfrozen_run = st.sidebar.selectbox("Select Unfrozen Run", unfrozen_runs_for_strat)
+    
+    # Load both results
+    frozen_full_res = load_run_results(selected_frozen_run)
+    unfrozen_full_res = load_run_results(selected_unfrozen_run)
+    
+    # Extract the target strategy results
+    frozen_strat_key = None
+    for k in frozen_full_res.keys():
+        if k.lower() == selected_strat_key:
+            frozen_strat_key = k
+            break
+            
+    unfrozen_strat_key = None
+    for k in unfrozen_full_res.keys():
+        if k.lower() == selected_strat_key:
+            unfrozen_strat_key = k
+            break
+            
+    cross_comparison_data = {
+        'strategy_name': selected_strat_disp,
+        'selected_strategy': selected_strat_key,
+        'frozen_run': selected_frozen_run,
+        'unfrozen_run': selected_unfrozen_run,
+        'frozen_metrics': frozen_full_res[frozen_strat_key],
+        'unfrozen_metrics': unfrozen_full_res[unfrozen_strat_key]
+    }
+    
+    # For compatibility with standard metrics mapping
+    results = {frozen_strat_key: frozen_full_res[frozen_strat_key]}
+    available_strategies = [frozen_strat_key]
+    selected_strategy = frozen_strat_key
+    
+    # Active run for inference playpen
+    active_inference_run = st.sidebar.radio("Active Run for Inference Playpen", ["Frozen Run", "Unfrozen Run"])
+    if active_inference_run == "Frozen Run":
+        selected_run = selected_frozen_run
+        run_type = "Frozen"
+    else:
+        selected_run = selected_unfrozen_run
+        run_type = "Unfrozen"
+
 else:
     selected_run = st.sidebar.selectbox("Select Experiment Run", runs)
     run_type = get_run_type(selected_run)
@@ -286,7 +395,128 @@ DEFECT_CATEGORIES = {
 
 # --- TAB 1: ANALYTICS ---
 with tab_analytics:
-    if not selected_strategy:
+    if selection_mode == "Cross-Run Backbone Comparison":
+        st.markdown(f"### 🔄 Backbone Comparison: **{cross_comparison_data['strategy_name']}**")
+        st.write("Comparing performance metrics between **Frozen** and **Unfrozen** backbone configurations.")
+        
+        # Summary cards side-by-side
+        col_card1, col_card2 = st.columns(2)
+        with col_card1:
+            avg_acc_f = cross_comparison_data['frozen_metrics']['metrics'].get('Average Accuracy', 0)
+            forgetting_f = cross_comparison_data['frozen_metrics']['metrics'].get('Forgetting', 0)
+            st.markdown(f"""
+            <div class="metric-card card-{selected_strategy.replace('+', 'p').replace('_', '-')}">
+                <div class="metric-label">FROZEN - {cross_comparison_data['frozen_run'].upper()}</div>
+                <div class="metric-val">{avg_acc_f:.4f}</div>
+                <div class="metric-label">Avg mIoU</div>
+                <div style="margin-top: 10px;" class="metric-label">Forgetting: {forgetting_f:.4f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col_card2:
+            avg_acc_u = cross_comparison_data['unfrozen_metrics']['metrics'].get('Average Accuracy', 0)
+            forgetting_u = cross_comparison_data['unfrozen_metrics']['metrics'].get('Forgetting', 0)
+            st.markdown(f"""
+            <div class="metric-card card-er-ace" style="border-left-color: #EC4899;">
+                <div class="metric-label">UNFROZEN - {cross_comparison_data['unfrozen_run'].upper()}</div>
+                <div class="metric-val">{avg_acc_u:.4f}</div>
+                <div class="metric-label">Avg mIoU</div>
+                <div style="margin-top: 10px;" class="metric-label">Forgetting: {forgetting_u:.4f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        st.markdown("---")
+
+        # Double column layout for accuracy heatmaps
+        col_left, col_right = st.columns([1, 1])
+
+        # Frozen Matrix
+        matrix_f = np.array(cross_comparison_data['frozen_metrics']['metrics']['Accuracy Matrix'])
+        with col_left:
+            st.markdown("#### ❄️ Frozen Backbone Heatmap")
+            fig_f, ax_f = plt.subplots(figsize=(7, 5))
+            mask_f = np.triu(np.ones_like(matrix_f, dtype=bool), k=1)
+            sns.heatmap(
+                matrix_f,
+                mask=mask_f,
+                annot=True,
+                fmt='.3f',
+                cmap='RdYlGn',
+                vmin=0,
+                vmax=1,
+                cbar_kws={'label': 'mIoU'},
+                square=True,
+                ax=ax_f
+            )
+            ax_f.set_title(f'Frozen Backbone mIoU Matrix', fontsize=12, fontweight='bold')
+            ax_f.set_xlabel('Task Evaluated On')
+            ax_f.set_ylabel('After Training Task')
+            tick_labels = [f'Task {i+1}' for i in range(matrix_f.shape[0])]
+            ax_f.set_xticklabels(tick_labels)
+            ax_f.set_yticklabels(tick_labels, rotation=0)
+            plt.tight_layout()
+            st.pyplot(fig_f)
+            
+        # Unfrozen Matrix
+        matrix_u = np.array(cross_comparison_data['unfrozen_metrics']['metrics']['Accuracy Matrix'])
+        with col_right:
+            st.markdown("#### 🔥 Unfrozen Backbone Heatmap")
+            fig_u, ax_u = plt.subplots(figsize=(7, 5))
+            mask_u = np.triu(np.ones_like(matrix_u, dtype=bool), k=1)
+            sns.heatmap(
+                matrix_u,
+                mask=mask_u,
+                annot=True,
+                fmt='.3f',
+                cmap='RdYlGn',
+                vmin=0,
+                vmax=1,
+                cbar_kws={'label': 'mIoU'},
+                square=True,
+                ax=ax_u
+            )
+            ax_u.set_title(f'Unfrozen Backbone mIoU Matrix', fontsize=12, fontweight='bold')
+            ax_u.set_xlabel('Task Evaluated On')
+            ax_u.set_ylabel('After Training Task')
+            tick_labels = [f'Task {i+1}' for i in range(matrix_u.shape[0])]
+            ax_u.set_xticklabels(tick_labels)
+            ax_u.set_yticklabels(tick_labels, rotation=0)
+            plt.tight_layout()
+            st.pyplot(fig_u)
+            
+        st.markdown("---")
+
+        # Comparison plot
+        st.markdown("#### 📈 Average mIoU Progression (Frozen vs. Unfrozen)")
+        
+        # Calculate step-by-step average accuracies
+        frozen_steps = []
+        unfrozen_steps = []
+        
+        for t in range(matrix_f.shape[0]):
+            frozen_steps.append(np.mean(matrix_f[t, :t+1]))
+            
+        for t in range(matrix_u.shape[0]):
+            unfrozen_steps.append(np.mean(matrix_u[t, :t+1]))
+            
+        fig_comp, ax_comp = plt.subplots(figsize=(8, 4))
+        
+        x_ticks = list(range(1, len(frozen_steps) + 1))
+        ax_comp.plot(x_ticks, frozen_steps, marker='o', color='#3B82F6', linewidth=2.5, label='Frozen Backbone')
+        ax_comp.plot(x_ticks, unfrozen_steps, marker='s', color='#EF4444', linewidth=2.5, linestyle='--', label='Unfrozen Backbone')
+        
+        ax_comp.set_xlabel('Training Step (After Task X)')
+        ax_comp.set_ylabel('Average mIoU (on all seen tasks)')
+        ax_comp.set_title('Average mIoU Retention Comparison', fontsize=12, fontweight='bold')
+        ax_comp.set_xticks(x_ticks)
+        ax_comp.set_xticklabels([f'After Task {t}' for t in x_ticks])
+        ax_comp.set_ylim([0.0, 1.0])
+        ax_comp.grid(True, alpha=0.3)
+        ax_comp.legend(loc='best')
+        plt.tight_layout()
+        st.pyplot(fig_comp)
+
+    elif not selected_strategy:
         st.info("No comparative analytics available for this run directory yet.")
     else:
         st.markdown(f"### Comparative Overview for **{selected_run.upper()}**")
@@ -300,7 +530,7 @@ with tab_analytics:
             
             with cols[i]:
                 st.markdown(f"""
-                <div class="metric-card card-{strat}">
+                <div class="metric-card card-{strat.replace('+', 'p').replace('_', '-')}">
                     <div class="metric-label">{strat.upper()}</div>
                     <div class="metric-val">{avg_acc:.4f}</div>
                     <div class="metric-label">Avg mIoU</div>
@@ -471,42 +701,49 @@ with tab_inference:
 
     # Model checkpoints selection
     run_path = SAVE_DIR / selected_run
-    checkpoints = [p.name for p in run_path.iterdir() if p.suffix == ".pth"]
+    checkpoints = [p.name for p in run_path.iterdir() if p.suffix == ".pth"] if run_path.exists() else []
     
-    if not checkpoints:
-        st.info("No trained checkpoint `.pth` files found in this run directory.")
+    # Filter checkpoints to match active strategy
+    filtered_checkpoints = []
+    
+    # 1. Check if the active run has its own baseline_model.pth
+    if "baseline_model.pth" in checkpoints:
+        filtered_checkpoints.append("baseline_model.pth")
+        
+    # 2. Add the Joint Baseline (all data) if it exists in the designated run
+    joint_run_folder = get_joint_run_for_backbone(run_type)
+    if (SAVE_DIR / joint_run_folder / "baseline_model.pth").exists():
+        filtered_checkpoints.append("Joint Baseline (all data)")
+        
+    # 3. Add strategy checkpoints
+    if selected_strategy:
+        strategy_name_mapping = {
+            'naive': 'Naive_Fine-tuning',
+            'er': 'Experience_Replay',
+            'der++': 'DER++',
+            'mer': 'Meta_Experience_Replay',
+            'si': 'Synaptic_Intelligence',
+            'lwf': 'Learning_Without_Forgetting',
+            'slca': 'SLCA',
+            'er_ace': 'ER-ACE'
+        }
+        pattern = strategy_name_mapping.get(selected_strategy.lower(), selected_strategy)
+        pattern_clean = pattern.replace(' ', '_').lower()
+        
+        for ckpt in checkpoints:
+            if pattern_clean in ckpt.replace(' ', '_').lower():
+                filtered_checkpoints.append(ckpt)
     else:
-        # Filter checkpoints to match active strategy
-        filtered_checkpoints = []
-        if "baseline_model.pth" in checkpoints:
-            filtered_checkpoints.append("baseline_model.pth")
-            
-        if selected_strategy:
-            strategy_name_mapping = {
-                'naive': 'Naive_Fine-tuning',
-                'er': 'Experience_Replay',
-                'der++': 'DER++',
-                'mer': 'Meta_Experience_Replay',
-                'si': 'Synaptic_Intelligence',
-                'lwf': 'Learning_Without_Forgetting',
-                'slca': 'SLCA',
-                'er_ace': 'ER-ACE'
-            }
-            pattern = strategy_name_mapping.get(selected_strategy.lower(), selected_strategy)
-            pattern_clean = pattern.replace(' ', '_').lower()
-            
-            for ckpt in checkpoints:
-                if pattern_clean in ckpt.replace(' ', '_').lower():
-                    filtered_checkpoints.append(ckpt)
-        else:
-            filtered_checkpoints = checkpoints
-            
-        if not filtered_checkpoints:
-            filtered_checkpoints = checkpoints
-            
+        filtered_checkpoints.extend(checkpoints)
+        
+    filtered_checkpoints = sorted(list(set(filtered_checkpoints)))
+    
+    if not filtered_checkpoints:
+        st.info("No trained checkpoint `.pth` files found.")
+    else:
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
-            selected_ckpt = st.selectbox("Select Model Checkpoint (.pth)", sorted(list(set(filtered_checkpoints))))
+            selected_ckpt = st.selectbox("Select Model Checkpoint (.pth)", filtered_checkpoints)
         with col_c2:
             conf_threshold = st.slider("Prediction Threshold Filter", 0.0, 1.0, 0.5, 0.05)
 
@@ -521,32 +758,74 @@ with tab_inference:
             
             dataset = get_cached_dataset()
             
+            # Identify pure and all indices
+            @st.cache_data
+            def get_dataset_split_indices(_dataset):
+                all_idx = list(range(len(_dataset)))
+                if _dataset.dataset_type == "OLD":
+                    return all_idx, all_idx
+                
+                pure_idx = []
+                for idx in range(len(_dataset)):
+                    img_info = _dataset.image_files[idx]
+                    img_id = img_info['id']
+                    annotations = _dataset.image_id_to_annotations.get(img_id, [])
+                    unique_cats = {anno['category_id'] for anno in annotations}
+                    if len(unique_cats) == 1:
+                        pure_idx.append(idx)
+                return pure_idx, all_idx
+
+            pure_indices, all_indices = get_dataset_split_indices(dataset)
+
+            # Filter selection
+            col_filter1, col_filter2 = st.columns([1, 1])
+            with col_filter1:
+                val_filter = st.selectbox(
+                    "Validation Image Filter",
+                    [f"All Validation Images ({len(all_indices)})", f"Pure Only - 1 Defect Class ({len(pure_indices)})"]
+                )
+            
+            active_indices = pure_indices if "Pure Only" in val_filter else all_indices
+            max_idx = len(active_indices) - 1
+
             if "image_index_val" not in st.session_state:
+                st.session_state["image_index_val"] = 0
+                
+            # Reset/clamp index if switching filters causes index out of range
+            if st.session_state["image_index_val"] > max_idx:
                 st.session_state["image_index_val"] = 0
 
             current_idx = st.session_state["image_index_val"]
 
             col_sel1, col_sel2 = st.columns([2, 1])
             with col_sel1:
-                image_idx = st.number_input(
-                    f"Select Image Index (0 to {len(dataset)-1})",
-                    min_value=0, max_value=len(dataset)-1,
+                image_sub_idx = st.number_input(
+                    f"Select Image Index (0 to {max_idx})",
+                    min_value=0, max_value=max_idx,
                     value=current_idx
                 )
-                if image_idx != current_idx:
-                    st.session_state["image_index_val"] = image_idx
+                if image_sub_idx != current_idx:
+                    st.session_state["image_index_val"] = image_sub_idx
                     st.rerun()
             with col_sel2:
                 # Random selector button
                 if st.button("Random Validation Image"):
-                    st.session_state["image_index_val"] = int(np.random.randint(0, len(dataset)))
+                    st.session_state["image_index_val"] = int(np.random.randint(0, len(active_indices)))
                     st.rerun()
 
-            # Retrieve selected image and mask
+            # Retrieve selected image and mask using active_indices mapping
+            image_idx = active_indices[st.session_state["image_index_val"]]
             image, mask, filename = dataset[image_idx]
 
             # Trigger PyTorch model loading
-            model, err = load_pytorch_model(selected_run, selected_ckpt)
+            if selected_ckpt == "Joint Baseline (all data)":
+                model_run = get_joint_run_for_backbone(run_type)
+                model_ckpt = "baseline_model.pth"
+            else:
+                model_run = selected_run
+                model_ckpt = selected_ckpt
+                
+            model, err = load_pytorch_model(model_run, model_ckpt)
 
             if err:
                 st.error(f"Error loading model weights: {err}")
