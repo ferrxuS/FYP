@@ -41,4 +41,8 @@ data/*.zip
 models/
 results/
 jobs/
-!results/.gitkeep
+
+# Local cluster / job-scheduler scripts and logs
+submit_*.sh
+*.sbatch
+slurm-*.out
